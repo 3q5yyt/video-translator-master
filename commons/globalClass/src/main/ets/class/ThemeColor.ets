@@ -1,0 +1,1 @@
+/** * 同步所有模块的主题颜色或者其他模块的数据 */@Observedexport class ThemeColor {  userThemeColor: ResourceColor //主题颜色  constructor(info?: ThemeColor) {    this.userThemeColor = info?.userThemeColor ?? ''  }}

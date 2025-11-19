@@ -1,0 +1,16 @@
+{
+  "name": "uicomponents",
+  "version": "1.0.0",
+  "description": "Please describe the basic information.",
+  "main": "Index.ets",
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@ohos/lottie": "^2.0.11",
+    "@hamo/tools": "^1.0.0",
+    "globalcolor": "file:../../commons/globalColor",
+    "globalclass": "file:../globalClass"
+  },
+  "devDependencies": {},
+  "dynamicDependencies": {}
+}

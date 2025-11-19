@@ -1,0 +1,184 @@
+{
+  "color": [
+    {
+      "name": "primaryColor",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "assistColor",
+      "value": "#F1F3F4"
+    },
+    {
+      "name": "backgroundColor",
+      "value": "#F1F3F4"
+    },
+    {
+      "name": "Me_backgroundColor",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "WallpaperBackgroundColor",
+      "value": "#393939"
+    },
+    {
+      "name": "masksColor",
+      "value": "#66000000"
+    },
+    {
+      "name": "cardColor_Start",
+      "value": "#E1F0FF"
+    },
+    {
+      "name": "cardColor_End",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "cardAssistColor",
+      "value": "#F8F8F8"
+    },
+    {
+      "name": "cardAssistColor02",
+      "value": "#E7E7E7"
+    },
+    {
+      "name": "cardAssistColor03",
+      "value": "#E7E7E7"
+    },
+    {
+      "name": "cardAssistColor04",
+      "value": "#FCF6ED"
+    },
+    {
+      "name": "cardAssistColor05",
+      "value": "#F8F8F8"
+    },
+    {
+      "name": "IconColor_Start",
+      "value": "#7468EC"
+    },
+    {
+      "name": "IconColor_End",
+      "value": "#A9A1FF"
+    },
+    {
+      "name": "IconColorNoselect_Start",
+      "value": "#E4E4E4"
+    },
+    {
+      "name": "IconColorNoselect_End",
+      "value": "#E4E4E4"
+    },
+    {
+      "name": "IconColor02",
+      "value": "#000000"
+    },
+    {
+      "name": "IconColor03",
+      "value": "#B7B7B7"
+    },
+    {
+      "name": "ButtonBackgroundColor",
+      "value": "#518BE9"
+    },
+    {
+      "name": "ButtonBackgroundColor02",
+      "value": "#000000"
+    },
+    {
+      "name": "ButtonBackgroundColor03",
+      "value": "#F8F8F8"
+    },
+    {
+      "name": "ButtonBackgroundColor04",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "ButtonBackgroundColor05",
+      "value": "#000000"
+    },
+    {
+      "name": "ButtonBackgroundColor05_Start",
+      "value": "#FF8D74"
+    },
+    {
+      "name": "ButtonBackgroundColor05_End",
+      "value": "#FE3E3B"
+    },
+    {
+      "name": "ButtonBackgroundColor06",
+      "value": "#F0F7FF"
+    },
+    {
+      "name": "onBorderColor",
+      "value": "#F8F8F8"
+    },
+    {
+      "name": "textColor",
+      "value": "#000000"
+    },
+    {
+      "name": "textColor02",
+      "value": "#000000"
+    },
+    {
+      "name": "textColor02Noselect",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "textColor03",
+      "value": "#017CFE"
+    },
+    {
+      "name": "textColor04",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "textColor05",
+      "value": "#B80202"
+    },
+    {
+      "name": "textColor06",
+      "value": "#017CFE"
+    },
+    {
+      "name": "remarkTextColor",
+      "value": "#B7B7B7"
+    },
+    {
+      "name": "signleColor_Black",
+      "value": "#000000"
+    },
+    {
+      "name": "signleColor_White",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "signleColor_Blue",
+      "value": "#017CFE"
+    },
+    {
+      "name": "signleColor_Grey",
+      "value": "#B7B7B7"
+    },
+    {
+      "name": "signleColor_TextBackGray",
+      "value": "#4c090909"
+    },
+    {
+      "name": "signleColor_Transparent",
+      "value": "#00000000"
+    },
+    {
+      "name": "signleColor_D8",
+      "value": "#D8D8D8"
+    },
+    {
+      "name": "tabsColor",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "zuixing_color",
+      "value": "#000000"
+    }
+  ]
+}

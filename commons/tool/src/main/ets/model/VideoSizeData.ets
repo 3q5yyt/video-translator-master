@@ -1,0 +1,1 @@
+import { media } from '@kit.MediaKit';import image from '@ohos.multimedia.image';export class VideoSizeData {  public photoSize: media.PixelMapParams = {    width: 0,    height: 0  };  // video total time.  public totalTime: number = 0;}

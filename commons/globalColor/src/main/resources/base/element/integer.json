@@ -1,0 +1,32 @@
+{
+  "integer": [
+    {
+      "name": "horizontalPadding",
+      "value": 10
+    },
+    {
+      "name": "defaultBorderRaduis",
+      "value": 12
+    },
+    {
+      "name": "verticalPadding",
+      "value": 12
+    },
+    {
+      "name": "listBorderRaduis",
+      "value": 20
+    },
+    {
+      "name": "dialogIconSize",
+      "value": 60
+    },
+    {
+      "name": "dialogIconYMovie",
+      "value": -35
+    },
+    {
+      "name": "mingPage_itemIconSize",
+      "value": 24
+    }
+  ]
+}

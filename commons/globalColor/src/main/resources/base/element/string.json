@@ -1,0 +1,12 @@
+{
+  "string": [
+    {
+      "name": "cardEditPage_topHeight",
+      "value": "40%"
+    },
+    {
+      "name": "cardEditPage_bottomHeight",
+      "value": "60%"
+    }
+  ]
+}

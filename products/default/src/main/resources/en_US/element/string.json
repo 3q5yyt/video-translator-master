@@ -1,0 +1,64 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "module description"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "nimble_widget"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "nimble_widget"
+    },
+    {
+      "name": "app_tracking_permission_reason",
+      "value": "The app obtains this information to recommend content that you may be interested in."
+    },
+    {
+      "name": "DefaultFormAbility_desc",
+      "value": "nimble_widget"
+    },
+    {
+      "name": "DefaultFormAbility_label",
+      "value": "nimble_widget"
+    },
+    {
+      "name": "widget_desc",
+      "value": "DIY your nimble widget"
+    },
+    {
+      "name": "widget_display_name",
+      "value": "widget"
+    },
+    {
+      "name": "requestPermissionsReason",
+      "value": "add Widget need this permission"
+    },
+    {
+      "name": "pedometer",
+      "value": "Adding an X panel requires the Pedometer permission"
+    },
+    {
+      "name": "Latitude_longitude",
+      "value": "Location information is required to get weather information"
+    },
+    {
+      "name": "LOCATION",
+      "value": "Get precise location permissions"
+    },
+    {
+      "name": "Bluetooth",
+      "value": "Whether to allow Bluetooth permissions to be turned on or off"
+    },
+    {
+      "name": "Weather_permissions",
+      "value": "Your location information is required to provide accurate local weather services."
+    },
+    {
+      "name": "crop_util",
+      "value": "Using the cropper requires read and write album permissions"
+    }
+  ]
+}

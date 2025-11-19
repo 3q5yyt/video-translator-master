@@ -1,0 +1,76 @@
+{
+  "app": {
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "C:\\Users\\Administrator\\.ohos\\config\\default_video-translator-master_iczxEtl9HHaANFFIN7xS66Vbznn2lO66u1jH0mGFD1Q=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001B77C4B2F09CD694B52A8A483DE551DDEC7473F02DFE44D05640260E057A16EEA7D684928A68EE14",
+          "profile": "C:\\Users\\Administrator\\.ohos\\config\\default_video-translator-master_iczxEtl9HHaANFFIN7xS66Vbznn2lO66u1jH0mGFD1Q=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "C:\\Users\\Administrator\\.ohos\\config\\default_video-translator-master_iczxEtl9HHaANFFIN7xS66Vbznn2lO66u1jH0mGFD1Q=.p12",
+          "storePassword": "0000001B739AE2ECE83A86B7F0827E45E29323A24EF38E6272712FB33876A55272A133A6D47584C1C240C9"
+        }
+      }
+    ],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+        "targetSdkVersion": "5.1.0(18)",
+        "compatibleSdkVersion": "5.0.4(16)",
+        "runtimeOS": "HarmonyOS",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug",
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "default",
+      "srcPath": "./products/default",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "uicomponents",
+      "srcPath": "./commons/uicomponents",
+    },
+    {
+      "name": "globalColor",
+      "srcPath": "./commons/globalColor",
+    },
+    {
+      "name": "globalClass",
+      "srcPath": "./commons/globalClass",
+    },
+    {
+      "name": "tool",
+      "srcPath": "./commons/tool",
+    },
+    {
+      "name": "Toolbox",
+      "srcPath": "./features/Toolbox",
+    }
+  ]
+}

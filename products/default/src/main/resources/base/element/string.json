@@ -1,0 +1,64 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "应用主模块"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "灵动小组件"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "灵动小组件"
+    },
+    {
+      "name": "app_tracking_permission_reason",
+      "value": "应用获知此信息，用于向您推荐可能感兴趣的内容"
+    },
+    {
+      "name": "DefaultFormAbility_desc",
+      "value": "灵动小组件"
+    },
+    {
+      "name": "DefaultFormAbility_label",
+      "value": "灵动小组件"
+    },
+    {
+      "name": "widget_desc",
+      "value": "diy你的个性卡片"
+    },
+    {
+      "name": "widget_display_name",
+      "value": "灵动小组件"
+    },
+    {
+      "name": "requestPermissionsReason",
+      "value": "添加卡片需要此权限"
+    },
+    {
+      "name": "pedometer",
+      "value": "添加X面板需要计步器权限"
+    },
+    {
+      "name": "Latitude_longitude",
+      "value": "获取天气信息需要位置信息"
+    },
+    {
+      "name": "LOCATION",
+      "value": "获取精确位置权限"
+    },
+    {
+      "name": "Bluetooth",
+      "value": "需要获取蓝牙信息，以便在卡片上展示设备状态，方便您的查看与操作。"
+    },
+    {
+      "name": "Weather_permissions",
+      "value": "需要获取您的定位信息，以提供准确的本地天气服务。"
+    },
+    {
+      "name": "crop_util",
+      "value": "使用裁剪器需要读写相册权限"
+    }
+  ]
+}

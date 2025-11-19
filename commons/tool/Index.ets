@@ -1,0 +1,1 @@
+export { VideoToLiveWallpaper,VideoToAnimationStyle } from './src/main/ets/utilPage/VideoToLiveWallpaper'

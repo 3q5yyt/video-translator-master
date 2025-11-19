@@ -1,0 +1,16 @@
+{
+  "color": [
+    {
+      "name": "backgroundColorForLeft",
+      "value": "#2F2F2F"
+    },
+    {
+      "name": "shareTextColor01",
+      "value": "#000"
+    },
+    {
+      "name": "shareButtonConfirm",
+      "value": "#43c0ff"
+    }
+  ]
+}

@@ -1,0 +1,137 @@
+{
+  "module": {
+    "name": "default",
+    "type": "entry",
+    "description": "$string:module_desc",
+    "mainElement": "EntryAbility",
+    "deviceTypes": [
+      "phone",
+      "tablet",
+      "2in1"
+    ],
+    "deliveryWithInstall": true,
+    "installationFree": false,
+    "pages": "$profile:main_pages",
+    "metadata": [
+      // 配置信息如下
+      {
+        "name": "client_id",
+        "value": "110071055"
+      },
+      {
+        "name": "app_id",
+        "value": "5765880207853456655"
+      }
+    ],
+    "abilities": [
+      {
+        "name": "EntryAbility",
+        "srcEntry": "./ets/entryability/EntryAbility.ets",
+        "description": "$string:EntryAbility_desc",
+        "icon": "$media:layered_image",
+        "label": "$string:EntryAbility_label",
+        "startWindowIcon": "$media:startNewIcon",
+        "startWindowBackground": "$color:start_window_background",
+        "exported": true,
+        "orientation": "auto_rotation_restricted",
+        "skills": [
+          {
+            "entities": [
+              "entity.system.home",
+              "entity.system.browsable"//使用applinking必须包含此项
+            ],
+            "actions": [
+              "action.system.home",
+              "ohos.want.action.viewData" //使用applinking必须包含此项
+            ],
+            "uris": [
+              {
+                // scheme须配置为https
+                "scheme": "https",
+                // host须配置为关联的域名
+                "host": "ohos.dream-ship.com",
+                // path可选，为了避免匹配到多个应用，建议配置该字段
+                "path": "nimbleWidget"
+              }
+            ],
+            // domainVerify须设置为true
+            "domainVerify": true
+          }
+        ]
+      }
+    ],
+    "extensionAbilities": [
+      {
+        "name": "EntryBackupAbility",
+        "srcEntry": "./ets/entrybackupability/EntryBackupAbility.ets",
+        "type": "backup",
+        "exported": false,
+        "metadata": [
+          {
+            "name": "ohos.extension.backup",
+            "resource": "$profile:backup_config"
+          }
+        ]
+      }
+    ],
+    "requestPermissions": [
+      {
+        "name": "ohos.permission.GET_NETWORK_INFO"//获取设备是4G还是5G
+      },
+      {
+        "name": "ohos.permission.INTERNET"//网络访问权限
+      },
+      {
+        "name": "ohos.permission.GET_WIFI_INFO"//wifi权限
+      },
+      {
+        "name": "ohos.permission.PRIVACY_WINDOW" //允许将窗口设置为隐私窗口,禁止截屏
+      },
+      {
+        "name": "ohos.permission.APP_TRACKING_CONSENT", //获取应用的oaid  可选，影响转化
+        "reason": "$string:app_tracking_permission_reason",
+        "usedScene": {
+          "abilities": [
+            "EntryAbility"
+          ],
+          "when": "inuse"
+        }
+      },
+      {
+        "name": "ohos.permission.KEEP_BACKGROUND_RUNNING",//保持后台运行的权限
+        "reason": "$string:requestPermissionsReason"
+      },
+      {
+        "name": "ohos.permission.VIBRATE"//震动权限
+      },
+      {
+        "name": "ohos.permission.ACTIVITY_MOTION", //计步器权限 此权限需要用户授权,user_grant级别
+        "reason": "$string:pedometer",
+        "usedScene": {}
+      },
+      {
+        "name": "ohos.permission.APPROXIMATELY_LOCATION", //获取经纬度信息,用于获取天气信息
+        "reason": "$string:Weather_permissions",
+        "usedScene": {}
+      },
+      {
+        "name": "ohos.permission.LOCATION",
+        "reason": "$string:Weather_permissions",
+        "usedScene": {}
+      },
+      {
+        "name": "ohos.permission.LOCATION_IN_BACKGROUND",
+        "reason": "$string:Weather_permissions",
+        "usedScene": {}
+      },
+      {
+        "name": "ohos.permission.ACCESS_BLUETOOTH" ,//是否打开蓝牙
+        "reason":"$string:Bluetooth",
+        "usedScene": {},
+      }
+    ],
+    "querySchemes": [
+
+    ],
+  }
+}

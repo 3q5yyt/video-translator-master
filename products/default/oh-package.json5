@@ -1,0 +1,16 @@
+{
+  "name": "default",
+  "version": "1.0.0",
+  "description": "Please describe the basic information.",
+  "main": "",
+  "author": "",
+  "license": "",
+  "dependencies": {
+    "@hamo/tools": "^1.0.0",
+    "globalcolor": "file:../../commons/globalColor",
+    "globalclass": "file:../../commons/globalClass",
+    "toolbox": "file:../../features/Toolbox"
+  },
+  "devDependencies": {},
+  "dynamicDependencies": {}
+}
