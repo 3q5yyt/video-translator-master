@@ -1,4 +1,4 @@
-import { curves, display, promptAction, window } from '@kit.ArkUI';
+import { curves, display, promptAction, UIContext, window } from '@kit.ArkUI';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { videoCropUtil } from '../util/videoCropUtil';
@@ -13,6 +13,8 @@ import { LoadingDialog } from '../commons/LoadingDialog';
 import { AdFreeUseButton } from 'uicomponents';
 import { OpenMemberVIP } from 'uicomponents/src/main/ets/button/OpenMemberVIP';
 import { AdActionType } from 'globalclass';
+import { AVPlayerDemo } from '../util/AVPlayerDemo';
+import { fileIo as fs, fileUri } from '@kit.CoreFileKit';
 
 export enum VideoToAnimationStyle {
   LIVE = 'LIVE',
@@ -114,7 +116,12 @@ const VideoToLiveWallpaperRatioData: VideoToLiveWallpaperRatio[] = [
     aspRatio: 21 / 9,
     icon: $r('app.media.movie'),
     ratio: '21:9'
-  }
+  },
+  {
+    describe: '自定义',
+    aspRatio: -1,
+    icon: $r('app.media.default')
+  },
 ]
 
 //可观测数组
@@ -134,6 +141,10 @@ const THUMBNAIL_COUNT = 4 // 时间轴显示的缩略图数量
 // 最大、最小时长（毫秒）
 const MAX_DURATION = 10000
 const MIN_DURATION = 3000
+
+//XComponent展示组件尺寸
+const VIDEO_WIDTH = 1280;
+const VIDEO_HEIGHT = 720;
 
 @Component
 export struct VideoToLiveWallpaper {
@@ -207,10 +218,15 @@ export struct VideoToLiveWallpaper {
   @State private selectIndex: number = 0 //选中了比例调节按钮的索引
   @State private isShowParameterAdjustment: boolean = false //是否显示参数调节的部分
   @State private AdjustParameters: AdjustableParameters = AdjustableParameters.Null //当前调节的参数
-  @State private videoSacle: number = 0 //视频缩放比例
+  @State private videoScale: number = 0 //视频缩放比例
   @State private gifClarity: number = 720 //GIF清晰度，默认480p
   @State private claritySelectIndex: number = 2 //清晰度选择索引，默认选中480p
   //=====================================================================视频裁切=====================
+
+
+  private xComponentController: XComponentController = new XComponentController();
+  @State surfaceID: string = '';
+  @State avPlayer: AVPlayerDemo = new AVPlayerDemo('');
   @State private currentWidth: number = 0; //视频容器宽高
   @State private currentHeight: number = 0;
   @State private scaleVideo: number = 0; // 视频缩放比
@@ -224,10 +240,11 @@ export struct VideoToLiveWallpaper {
   @State private Y1: number = 0;
   @State private X2: number = 0;
   @State private Y2: number = 0;
-  @State private isOr:boolean = false;
+  @State private isOr: boolean = false;
   @State isSelecting: boolean = false; //是否裁切
   @State isCropDone: boolean = false; //用于控制确定和撤销裁切
   @State cropDone: boolean = false; //用于控制buildMask显示
+  private file: fileIo.File | null = null; // 视频文件描述符
   private cropValue: videoRect = {
     // ffmpeg裁切信息
     x: 0,
@@ -285,8 +302,9 @@ export struct VideoToLiveWallpaper {
         await this.cleanupResources()
 
         this.selectedVideoUri = photoSelectResult.photoUris[0]
-        // 直接进入剪辑模式，允许用户选择视频区域
-        this.isEditMode = true
+
+        this.file = await fs.open(this.selectedVideoUri);
+
         //开始获取视频信息
         this.getVideoInfo()
       })
@@ -490,17 +508,21 @@ export struct VideoToLiveWallpaper {
           .transition(TransitionEffect.scale({ x: 0.2, y: 0.2 }).animation({ curve: curves.springMotion(0.6, 0.8) }))
 
           //video组件播放视频 - 使用条件渲染解决aspectRatio重置问题
-          if (this.videoSacle === 0 && this.AdjustParameters != AdjustableParameters.Crop) {
+          if (this.videoScale === 0) {
             // 默认比例：不设置aspectRatio，让视频保持原始比例
             this.buildVideoComponent(false)
-          } else if (this.AdjustParameters === AdjustableParameters.Crop) {
+          } else if (this.videoScale === -1) {
             this.cropVideoComponent()
           } else {
             // 指定比例：设置aspectRatio
             this.buildVideoComponent(true)
           }
         }
-        .height('50%')
+        .onSizeChange((oldValue: SizeOptions, newValue: SizeOptions) => {
+          this.currentWidth = Number(newValue.width)
+          this.currentHeight = Number(newValue.height)
+        })
+        .height('65%')
         .width('100%')
         .margin({ top: 10, bottom: 10 })
         .backgroundColor('#141414')
@@ -566,318 +588,6 @@ export struct VideoToLiveWallpaper {
         .flexBasis('auto')
         .displayPriority(2)
 
-        Blank()
-          .displayPriority(1)
-        // 视频的时间轴区域
-        Row() {
-          Stack() {
-            Row() {
-              this.thumbnailShow()
-            }
-            .opacity(0.6)
-            .justifyContent(FlexAlign.Start)
-            .width('100%')
-            .height(THUMBNAIL_HEIGHT)
-
-            Row() {
-              Row() {
-                this.thumbnailShow()
-              }
-              .clip(true)
-              .justifyContent(FlexAlign.Start)
-              .width(this.rightWidth)
-              .height(THUMBNAIL_HEIGHT)
-            }
-            .justifyContent(FlexAlign.Start)
-            .width('100%')
-
-            Row() {
-              Row() {
-              }
-              .backgroundColor('rgba(0,0,0,0.6)')
-              .clip(true)
-              .justifyContent(FlexAlign.Start)
-              .width(this.leftWidth)
-              .height(THUMBNAIL_HEIGHT)
-            }
-            .justifyContent(FlexAlign.Start)
-
-            Row() {
-              Row() {
-                this.thumbnailShow()
-              }
-              .opacity(0.6)
-              .clip(true)
-              .justifyContent(FlexAlign.Start)
-              .width(this.leftWidth)
-              .height(THUMBNAIL_HEIGHT)
-            }
-            .justifyContent(FlexAlign.Start)
-
-            // 中间拖动区域：整体平移 startTime / endTime
-            Row() {
-            }
-            .width(this.rightWidth - this.leftWidth)
-            .height(THUMBNAIL_HEIGHT)
-            .offset({ x: this.leftWidth })
-            .border({ width: { top: 2, bottom: 2 }, color: Color.White })
-            .justifyContent(FlexAlign.Center)
-            .gesture(
-              PanGesture({ fingers: 1, distance: 1 })
-                .onActionStart(() => {
-                  // 只在剪辑模式下且已选择视频时允许拖动
-                  if (!this.isEditMode || !this.selectedVideoUri) {
-                    return;
-                  }
-                  // 1. 拖动开始时立即暂停视频，防止播放时时间更新干扰
-                  this.videoController.pause();
-                  this.isVideoStart = false; // 标记视频已暂停
-                  // 2. 保存拖动前的相对偏移比例
-                  this.initialRelative = (this.currentTime - this.startTime) / (this.endTime - this.startTime);
-                  // 3. 显示时间popup
-                  this.showTimePopup = true;
-                })
-                .onActionUpdate(event => {
-                  // 只在剪辑模式下且已选择视频时允许拖动
-                  if (!this.isEditMode || !this.selectedVideoUri) {
-                    return;
-                  }
-                  let deltaX = event.offsetX;
-                  let newLeft = this.leftWidthOrigin + deltaX;
-                  let newRight = this.rightWidthOrigin + deltaX;
-
-                  if (newLeft >= 0 && newRight <= this.getTimelineWidth()) {
-                    this.leftWidth = newLeft;
-                    this.rightWidth = newRight;
-
-                    // 更新 startTime / endTime
-                    this.startTime = this.offsetToTime(this.leftWidth);
-                    this.endTime = this.offsetToTime(this.rightWidth);
-
-                    // 更新 currentTime 和 currentOffset
-                    this.currentTime = this.startTime + this.initialRelative * (this.endTime - this.startTime);
-                    this.currentOffset = this.leftWidth + this.initialRelative * (this.rightWidth - this.leftWidth);
-
-                    // 移除频繁的视频时间更新，减少延迟
-                    // this.videoController.setCurrentTime(Math.round(this.currentTime / 1000));
-                  }
-                })
-                .onActionEnd(async () => {
-                  // 只在剪辑模式下且已选择视频时处理拖动结束
-                  if (!this.isEditMode || !this.selectedVideoUri) {
-                    return;
-                  }
-                  this.leftWidthOrigin = this.leftWidth;
-                  this.rightWidthOrigin = this.rightWidth;
-                  // 拖动结束后自动从新区域开始播放：先暂停 -> 设置时间 -> 等待100ms -> 开始播放
-                  this.videoController.pause();
-                  this.isVideoStart = false;
-                  this.videoController.setCurrentTime(Math.round(this.startTime / 1000), SeekMode.Accurate);
-                  await new Promise<void>(r => setTimeout(r, 120));
-                  this.videoController.start();
-                  this.isVideoStart = true;
-                  // 隐藏时间popup
-                  this.showTimePopup = false;
-                })
-            )
-
-            // 左边按钮：控制 startTime
-            Text('|')
-              .fontWeight(800)
-              .fontColor(Color.Gray)
-              .textAlign(TextAlign.Center)
-              .borderRadius({ topLeft: 6, bottomLeft: 6 })
-              .backgroundColor(Color.White)
-              .height(THUMBNAIL_HEIGHT)
-              .width(16)
-              .offset({ x: this.leftWidth - 16 })
-              .gesture(
-                PanGesture({ fingers: 1, distance: 1 })
-                  .onActionStart(() => {
-                    // 只在剪辑模式下且已选择视频时允许拖动
-                    if (!this.isEditMode || !this.selectedVideoUri) {
-                      return;
-                    }
-                    this.showTimePopup = true;
-                  })
-                  .onActionUpdate(async event => {
-                    // 只在剪辑模式下且已选择视频时允许拖动
-                    if (!this.isEditMode || !this.selectedVideoUri) {
-                      return;
-                    }
-                    let newLeftWidth = this.leftWidthOrigin + event.offsetX
-                    let newStartTime = this.offsetToTime(newLeftWidth)
-
-                    // 只在剪辑模式下应用时长限制
-                    if (this.isEditMode) {
-                      // 限制最大时长
-                      if (this.endTime - newStartTime > MAX_DURATION) {
-                        newStartTime = this.endTime - MAX_DURATION
-                        newLeftWidth = this.timeToOffset(newStartTime)
-                      }
-
-                      // 限制最小时长
-                      if (this.endTime - newStartTime < MIN_DURATION) {
-                        newStartTime = this.endTime - MIN_DURATION
-                        newLeftWidth = this.timeToOffset(newStartTime)
-                      }
-                    }
-
-                    if (newLeftWidth >= 0 &&
-                      newLeftWidth + this.oneSecondWidth <= this.rightWidth &&
-                    this.canDrag) {
-                      this.canDrag = false
-                      this.leftWidth = newLeftWidth
-                      this.startTime = newStartTime
-                      this.currentTime = this.startTime
-                      this.videoController.pause()
-                      this.isVideoStart = false
-                      this.videoController.setCurrentTime(Math.round(this.currentTime / 1000), SeekMode.Accurate)
-                      this.currentOffset = this.timeToOffset(this.currentTime)
-                      this.currentTimeShow = videoCropUtil.formatDuration(this.currentTime)
-                      if (!this.isPlayed) {
-                        this.pixelMapShow = await this.fetchFrameByTime(this.currentTime * 1000, false)
-                      }
-                      this.canDrag = true
-                    }
-                  })
-                  .onActionEnd(() => {
-                    // 只在剪辑模式下且已选择视频时处理拖动结束
-                    if (!this.isEditMode || !this.selectedVideoUri) {
-                      return;
-                    }
-                    this.leftWidthOrigin = this.leftWidth
-                    this.currentOffsetOrigin = this.currentOffset
-                    this.showTimePopup = false;
-                  })
-                  .onActionCancel(() => {
-                    // 只在剪辑模式下且已选择视频时处理拖动取消
-                    if (!this.isEditMode || !this.selectedVideoUri) {
-                      return;
-                    }
-                    this.leftWidthOrigin = this.leftWidth
-                    this.currentOffsetOrigin = this.currentOffset
-                    this.showTimePopup = false;
-                  })
-              )
-
-            // 右边按钮：控制 endTime
-            Text('|')
-              .fontWeight(800)
-              .fontColor(Color.Gray)
-              .textAlign(TextAlign.Center)
-              .borderRadius({ topRight: 6, bottomRight: 6 })
-              .backgroundColor(Color.White)
-              .height(THUMBNAIL_HEIGHT)
-              .width(16)
-              .offset({ x: this.rightWidth })
-              .gesture(
-                PanGesture({ fingers: 1, distance: 1 })
-                  .onActionStart(() => {
-                    // 只在剪辑模式下且已选择视频时允许拖动
-                    if (!this.isEditMode || !this.selectedVideoUri) {
-                      return;
-                    }
-                    this.showTimePopup = true;
-                  })
-                  .onActionUpdate(async event => {
-                    // 只在剪辑模式下且已选择视频时允许拖动
-                    if (!this.isEditMode || !this.selectedVideoUri) {
-                      return;
-                    }
-                    let newRightWidth = this.rightWidthOrigin + event.offsetX
-                    let newEndTime = this.offsetToTime(newRightWidth)
-
-                    // 只在剪辑模式下应用时长限制
-                    if (this.isEditMode) {
-                      // 限制最大时长
-                      if (newEndTime - this.startTime > MAX_DURATION) {
-                        newEndTime = this.startTime + MAX_DURATION
-                        newRightWidth = this.timeToOffset(newEndTime)
-                      }
-
-                      // 限制最小时长
-                      if (newEndTime - this.startTime < MIN_DURATION) {
-                        newEndTime = this.startTime + MIN_DURATION
-                        newRightWidth = this.timeToOffset(newEndTime)
-                      }
-                    }
-
-                    if (newRightWidth <= this.getTimelineWidth() &&
-                      newRightWidth >= this.leftWidth + this.oneSecondWidth &&
-                    this.canDrag) {
-                      this.canDrag = false
-                      this.rightWidth = newRightWidth
-                      this.endTime = newEndTime
-                      this.currentTime = this.endTime
-                      this.videoController.pause()
-                      this.isVideoStart = false
-                      this.videoController.setCurrentTime(Math.round(this.currentTime / 1000), SeekMode.Accurate)
-                      this.currentOffset = this.timeToOffset(this.currentTime)
-                      this.currentTimeShow = videoCropUtil.formatDuration(this.currentTime)
-                      if (!this.isPlayed) {
-                        this.pixelMapShow = await this.fetchFrameByTime(this.currentTime * 1000, false)
-                      }
-                      this.canDrag = true
-                    }
-                  })
-                  .onActionEnd(() => {
-                    // 只在剪辑模式下且已选择视频时处理拖动结束
-                    if (!this.isEditMode || !this.selectedVideoUri) {
-                      return;
-                    }
-                    this.rightWidthOrigin = this.rightWidth
-                    this.currentOffsetOrigin = this.currentOffset
-                    this.showTimePopup = false;
-                  })
-                  .onActionCancel(() => {
-                    // 只在剪辑模式下且已选择视频时处理拖动取消
-                    if (!this.isEditMode || !this.selectedVideoUri) {
-                      return;
-                    }
-                    this.rightWidthOrigin = this.rightWidth
-                    this.currentOffsetOrigin = this.currentOffset
-                    this.showTimePopup = false;
-                  })
-              )
-
-            Row()
-              .backgroundColor(Color.White)
-              .width(2)
-              .height(THUMBNAIL_HEIGHT)
-              .offset({ x: this.currentOffset })
-          }
-          .width('80%')
-          .height(THUMBNAIL_HEIGHT)
-          .alignContent(Alignment.TopStart)
-          .bindPopup(this.showTimePopup, {
-            builder: this.timePopupBuilder,
-            placement: Placement.Top,
-            maskColor: 0x33000000,
-            popupColor: Color.White,
-            enableArrow: true,
-            showInSubWindow: false,
-            onStateChange: (e) => {
-              if (!e.isVisible) {
-                this.showTimePopup = false
-              }
-            }
-          })
-          .onClick(() => {
-            // 只有选择视频后才能显示时间popup
-            if (this.selectedVideoUri) {
-              this.showTimePopup = !this.showTimePopup
-            }
-          })
-        }
-        // .margin({ top: 50 })
-        .justifyContent(FlexAlign.Center)
-        .width('100%')
-        .displayPriority(2)
-        .flexBasis('auto')
-
-        Blank()
-          .displayPriority(1)
         Column() {
           //参数调节选择区域
           Row() {
@@ -887,11 +597,18 @@ export struct VideoToLiveWallpaper {
               this.SelectClarity()
             } else if (this.AdjustParameters == AdjustableParameters.Speed) {
               this.SelectSpeed()
+            } else if (this.AdjustParameters == AdjustableParameters.Crop) {
+              this.SelectCrop()
             }
           }
           .width('100%')
-          .padding({ left: 10, right: 10 })
-          .height(90)
+          .padding({
+            left: 10,
+            right: 10,
+            top: 20,
+            bottom: 20
+          })
+          .height(110)
           .visibility((this.isShowParameterAdjustment && this.videoStyle !== VideoToAnimationStyle.LIVE) ?
           Visibility.Visible : Visibility.Hidden)
           .transition(TransitionEffect.translate({ y: '100%' }))
@@ -930,6 +647,7 @@ export struct VideoToLiveWallpaper {
                           this.isShowParameterAdjustment = false
                         } else {
                           // 否则显示清晰度参数
+                          this.videoScale = 0
                           this.isShowParameterAdjustment = true
                           this.AdjustParameters = AdjustableParameters.Clarity
                         }
@@ -951,23 +669,14 @@ export struct VideoToLiveWallpaper {
                           .maxLines(1)
                       }
                       .onClick(() => {
-                        // 显示比例选择
                         if (this.isShowParameterAdjustment &&
                           this.AdjustParameters === AdjustableParameters.Crop) {
-                          // 如果当前已显示比例参数，则隐藏
                           this.isShowParameterAdjustment = false
                         } else {
-                          // 否则显示比例参数
-                          if (this.videoSize.photoSize.width == 0) {
-                            promptAction.showToast({ message: "未选择视频" })
-                          } else {
-                            this.isShowParameterAdjustment = true
-                            this.AdjustParameters = AdjustableParameters.Crop
-                            this.videoSacle = 0
-                            this.selectIndex = 0
-                            this.gifCropRatio = ''
-                            promptAction.showToast({ message: "使用裁切功能后，比例功能的效果将会消失" })
-                          }
+                          this.videoScale = 0
+                          this.isEditMode = true
+                          this.isShowParameterAdjustment = true
+                          this.AdjustParameters = AdjustableParameters.Crop
                         }
                       })
                     }
@@ -1020,7 +729,7 @@ export struct VideoToLiveWallpaper {
                           // 如果当前已显示比例参数，则隐藏
                           this.isShowParameterAdjustment = false
                         } else {
-                          // 否则显示比例参数
+                          this.videoScale = 0                                   //======================= 明天修改要求  只将自定义功能隔离出来==================//
                           this.isShowParameterAdjustment = true
                           this.AdjustParameters = AdjustableParameters.Speed
                         }
@@ -1041,7 +750,7 @@ export struct VideoToLiveWallpaper {
               //保存选项区域 - 使用已有的builder
               if (this.videoStyle == VideoToAnimationStyle.LIVE) {
                 //保存为动态壁纸
-                Row() {
+                Column() {
                   Row() {
                     if ((!this.isVip) && this.VideoEditing < 2) {
                       this.buildActionButton(false)
@@ -1069,12 +778,12 @@ export struct VideoToLiveWallpaper {
                   .justifyContent(FlexAlign.Center)
                   .width('100%')
                 }
+                .height('100%')
                 .width('100%')
-                .justifyContent(FlexAlign.Center)
                 .padding({ left: 10, right: 10 })
               } else if (this.videoStyle == VideoToAnimationStyle.GIF) {
                 //保存为GIF
-                Row() {
+                Column() {
                   Row() {
                     if ((!this.isVip) && this.VideoEditing < 2) {
                       this.buildActionButton(false)
@@ -1102,22 +811,23 @@ export struct VideoToLiveWallpaper {
                   .justifyContent(FlexAlign.Center)
                   .width('100%')
                 }
+                .height('100%')
                 .width('100%')
-                .justifyContent(FlexAlign.Center)
                 .padding({ left: 10, right: 10 })
               }
             }
           }
           .width('100%')
-          .height(63)
+          .height('100%')
           .justifyContent(FlexAlign.Start)
         }
-        .justifyContent(FlexAlign.SpaceBetween)
+        .justifyContent(FlexAlign.End)
         .width('100%')
         .flexBasis('auto')
-        .height(153)
+        .height(180)
         .displayPriority(2)
       }
+      .justifyContent(FlexAlign.SpaceBetween)
       .flexGrow(1)
       .flexShrink(1)
 
@@ -1134,130 +844,174 @@ export struct VideoToLiveWallpaper {
   @Builder
   cropVideoComponent() {
     Stack() {
-      Video({ src: this.selectedVideoUri, controller: this.videoController, previewUri: this.pixelMapShow })
-        .objectFit(ImageFit.Contain)
-        .animation({
-          duration: 400,
-          curve: Curve.EaseInOut
-        })
-        .controls(false)
-        .visibility(this.selectedVideoUri ? Visibility.Visible : Visibility.None)
-        .transition(TransitionEffect.scale({ x: 0.2, y: 0.2 }).animation({ curve: curves.springMotion(0.6, 0.8) }))
-        .onUpdate((event) => {
-          if (event) {
-            // 更新当前播放时间
-            this.currentTime = event.time * 1000; // 转换为毫秒
-            this.currentTimeShow = videoCropUtil.formatDurationSecond(event.time)
-
-            // 更新播放指示条位置
-            const newOffset = this.timeToOffset(event.time * 1000);
-            if (newOffset >= this.currentOffsetOrigin) {
-              this.currentOffset = newOffset
+      XComponent({
+        id: 'VideoCropping',
+        type: XComponentType.SURFACE,
+        controller: this.xComponentController
+      })
+        .onLoad(async () => {
+          this.isOr = await videoCropUtil.getVideoOrientation(this.selectedVideoUri, this.context) //判断视频是否旋转
+          if (!this.isOr) {
+            if (this.videoSize.photoSize.width! > this.videoSize.photoSize.height!) {
+              this.scaleVideo = this.currentWidth/ this.videoSize.photoSize.width!
+              this.xComponentController.setXComponentSurfaceRect({
+                surfaceWidth: this.getUIContext().vp2px(this.currentWidth),
+                surfaceHeight: this.getUIContext().vp2px(this.scaleVideo*this.videoSize.photoSize.height!)
+              });
+            } else {
+              this.scaleVideo = this.currentHeight/ this.videoSize.photoSize.height!
+              this.xComponentController.setXComponentSurfaceRect({
+                surfaceWidth: this.getUIContext().vp2px(this.scaleVideo*this.videoSize.photoSize.width!),
+                surfaceHeight: this.getUIContext().vp2px(this.currentHeight)
+              });
             }
-
-            // 视频播放到结束位置时自动暂停
-            if (event.time >= this.endTime / 1000 - 1) { // 1秒容差
-              console.log('视频播放到结束位置，自动暂停');
-              this.videoController.pause()
-              this.isVideoStart = false
-              this.currentTime = this.endTime;
-              this.currentOffset = this.timeToOffset(this.endTime)
-              this.currentOffsetOrigin = this.currentOffset
-            }
-          }
-        })
-        .onPause(() => {
-          this.isVideoStart = false
-          console.log('结束播放了');
-        })
-        .onPrepared(() => {
-          // 视频准备就绪时，只更新UI状态，不设置播放时间
-          console.log('视频准备就绪');
-          this.currentOffset = this.timeToOffset(this.startTime);
-          this.currentOffsetOrigin = this.currentOffset;
-        })
-        .onStart(() => {
-          console.log('视频开始播放');
-          this.isPlayed = true
-          this.isVideoStart = true
-          // 同步播放指示条位置到当前时间
-          this.currentOffset = this.timeToOffset(this.currentTime)
-          this.currentOffsetOrigin = this.currentOffset
-        })
-        .onSizeChange(async (oldValue: SizeOptions, newValue: SizeOptions) => {
-          if(this.videoSize.photoSize.width!>this.videoSize.photoSize.height!){
-            this.scaleVideo = Number(newValue.width) / this.videoSize.photoSize.width!
-            this.currentHeight = this.scaleVideo*this.videoSize.photoSize.height!
-            this.currentWidth = Number(newValue.width)
           }else {
-            this.scaleVideo = Number(newValue.height) / this.videoSize.photoSize.height!
-            this.currentWidth = this.scaleVideo*this.videoSize.photoSize.width!
-            this.currentHeight = Number(newValue.height)
+            if (this.videoSize.photoSize.width! > this.videoSize.photoSize.height!) {
+              this.scaleVideo = this.currentHeight/ this.videoSize.photoSize.width!
+              this.xComponentController.setXComponentSurfaceRect({
+                surfaceWidth: this.getUIContext().vp2px(this.scaleVideo*this.videoSize.photoSize.height!),
+                surfaceHeight: this.getUIContext().vp2px(this.currentHeight)
+              });
+            } else {
+              this.scaleVideo = this.currentWidth/ this.videoSize.photoSize.height!
+              this.xComponentController.setXComponentSurfaceRect({
+                surfaceWidth: this.getUIContext().vp2px(this.currentWidth),
+                surfaceHeight: this.getUIContext().vp2px(this.scaleVideo*this.videoSize.photoSize.width!)
+              });
+            }
           }
-           this.isOr = await videoCropUtil.getVideoOrientation(this.selectedVideoUri, this.context)
-          if(this.isOr){
-            let temp = this.currentWidth
-            this.currentWidth = this.currentHeight
-            this.currentHeight =temp
-          }
+          this.surfaceID = this.xComponentController.getXComponentSurfaceId();
+          this.avPlayer = new AVPlayerDemo(this.surfaceID, 0);
+          this.avPlayer.avPlayerUrlDemo(this.file?.fd)
+
         })
 
-      if (this.AdjustParameters == AdjustableParameters.Crop) {
-        if (!this.cropDone) {
-          Column()
-            .width(this.currentWidth)
-            .height(this.currentHeight)
-            .backgroundColor('rgba(0,0,0,0.6)')
-          Canvas(this.canvasContext)
-            .width(this.currentWidth)
-            .height(this.currentHeight)
-            .onTouch((event) => this.handleTouchEvent(event))
-          if (this.isCropDone) {
-            Row({ space: 10 }) {
-              Image($r("app.media.Undo"))
-                .width(20)
-                .onClick(() => {
-                  this.X1 = 0;
-                  this.Y1 = 0;
-                  this.X2 = 0;
-                  this.Y2 = 0;
-                  this.canvasContext.clearRect(0, 0, this.currentWidth, this.currentHeight)
-                  this.isCropDone = false;
-                  this.cropDone = false;
-                })
-              Image($r('app.media.check'))
-                .width(20)
-                .onClick(async () => {
-                  promptAction.showToast({ message: "裁切成功" })
-                  console.log("zhao  真实宽度:" + this.videoSize.photoSize.width! + "  真实高度：" +
-                    this.videoSize.photoSize.height! + "\n" +
-                    "容器宽高： " + this.currentWidth + " , " + this.currentHeight)
+    }.height('100%')
+    .width('100%')
 
-                  this.canvasContext.clearRect(0, 0, this.currentWidth, this.currentHeight)
-                  this.isCropDone = false;
-                  this.cropDone = true;
-
-
-                  this.cropValue = {
-                    x: this.X1 / this.scaleVideo,
-                    y: this.Y1 / this.scaleVideo,
-                    width: (this.X2 - this.X1) / this.scaleVideo,
-                    height: (this.Y2 - this.Y1) / this.scaleVideo
-                  }
-
-                  //387.69  360.3
-                })
-            }.position({ x: this.X2, y: this.Y2 })
-            .justifyContent(FlexAlign.Center)
-            .padding(15)
-          }
-        } else {
-
-          this.buildMask();
-        }
-      }
-    }.width(this.currentWidth)
-    .height(this.currentHeight)
+    // Stack() {
+    //   Video({ src: this.selectedVideoUri, controller: this.videoController, previewUri: this.pixelMapShow })
+    //     .objectFit(ImageFit.Contain)
+    //     .animation({
+    //       duration: 400,
+    //       curve: Curve.EaseInOut
+    //     })
+    //     .controls(false)
+    //     .visibility(this.selectedVideoUri ? Visibility.Visible : Visibility.None)
+    //     .transition(TransitionEffect.scale({ x: 0.2, y: 0.2 }).animation({ curve: curves.springMotion(0.6, 0.8) }))
+    //     .onUpdate((event) => {
+    //       if (event) {
+    //         // 更新当前播放时间
+    //         this.currentTime = event.time * 1000; // 转换为毫秒
+    //         this.currentTimeShow = videoCropUtil.formatDurationSecond(event.time)
+    //
+    //         // 更新播放指示条位置
+    //         const newOffset = this.timeToOffset(event.time * 1000);
+    //         if (newOffset >= this.currentOffsetOrigin) {
+    //           this.currentOffset = newOffset
+    //         }
+    //
+    //         // 视频播放到结束位置时自动暂停
+    //         if (event.time >= this.endTime / 1000 - 1) { // 1秒容差
+    //           console.log('视频播放到结束位置，自动暂停');
+    //           this.videoController.pause()
+    //           this.isVideoStart = false
+    //           this.currentTime = this.endTime;
+    //           this.currentOffset = this.timeToOffset(this.endTime)
+    //           this.currentOffsetOrigin = this.currentOffset
+    //         }
+    //       }
+    //     })
+    //     .onPause(() => {
+    //       this.isVideoStart = false
+    //       console.log('结束播放了');
+    //     })
+    //     .onPrepared(() => {
+    //       // 视频准备就绪时，只更新UI状态，不设置播放时间
+    //       console.log('视频准备就绪');
+    //       this.currentOffset = this.timeToOffset(this.startTime);
+    //       this.currentOffsetOrigin = this.currentOffset;
+    //     })
+    //     .onStart(() => {
+    //       console.log('视频开始播放');
+    //       this.isPlayed = true
+    //       this.isVideoStart = true
+    //       // 同步播放指示条位置到当前时间
+    //       this.currentOffset = this.timeToOffset(this.currentTime)
+    //       this.currentOffsetOrigin = this.currentOffset
+    //     })
+    //     .onSizeChange(async (oldValue: SizeOptions, newValue: SizeOptions) => {
+    //       if (this.videoSize.photoSize.width! > this.videoSize.photoSize.height!) {
+    //         this.scaleVideo = Number(newValue.width) / this.videoSize.photoSize.width!
+    //         this.currentHeight = this.scaleVideo * this.videoSize.photoSize.height!
+    //         this.currentWidth = Number(newValue.width)
+    //       } else {
+    //         this.scaleVideo = Number(newValue.height) / this.videoSize.photoSize.height!
+    //         this.currentWidth = this.scaleVideo * this.videoSize.photoSize.width!
+    //         this.currentHeight = Number(newValue.height)
+    //       }
+    //       this.isOr = await videoCropUtil.getVideoOrientation(this.selectedVideoUri, this.context)
+    //       if (this.isOr) {
+    //         let temp = this.currentWidth
+    //         this.currentWidth = this.currentHeight - 10
+    //         this.currentHeight = temp - 20
+    //       }
+    //     })
+    //
+    //   if (this.AdjustParameters == AdjustableParameters.Crop) {
+    //     if (!this.cropDone) {
+    //       Column()
+    //         .width(this.currentWidth)
+    //         .height(this.currentHeight)
+    //         .backgroundColor('rgba(0,0,0,0.6)')
+    //       Canvas(this.canvasContext)
+    //         .width(this.currentWidth)
+    //         .height(this.currentHeight)
+    //         .onTouch((event) => this.handleTouchEvent(event))
+    //       if (this.isCropDone) {
+    //         Row({ space: 10 }) {
+    //           Image($r("app.media.Undo"))
+    //             .width(20)
+    //             .onClick(() => {
+    //               this.X1 = 0;
+    //               this.Y1 = 0;
+    //               this.X2 = 0;
+    //               this.Y2 = 0;
+    //               this.canvasContext.clearRect(0, 0, this.currentWidth, this.currentHeight)
+    //               this.isCropDone = false;
+    //               this.cropDone = false;
+    //             })
+    //           Image($r('app.media.check'))
+    //             .width(20)
+    //             .onClick(async () => {
+    //               promptAction.showToast({ message: "裁切成功" })
+    //               console.log("zhao  真实宽度:" + this.videoSize.photoSize.width! + "  真实高度：" +
+    //                 this.videoSize.photoSize.height! + "\n" +
+    //                 "容器宽高： " + this.currentWidth + " , " + this.currentHeight)
+    //
+    //               this.canvasContext.clearRect(0, 0, this.currentWidth, this.currentHeight)
+    //               this.isCropDone = false;
+    //               this.cropDone = true;
+    //
+    //
+    //               this.cropValue = {
+    //                 x: this.X1 / this.scaleVideo,
+    //                 y: this.Y1 / this.scaleVideo,
+    //                 width: (this.X2 - this.X1) / this.scaleVideo,
+    //                 height: (this.Y2 - this.Y1) / this.scaleVideo
+    //               }
+    //
+    //               //387.69  360.3
+    //             })
+    //         }.position({ x: this.X2, y: this.Y2 })
+    //         .justifyContent(FlexAlign.Center)
+    //         .padding(15)
+    //       }
+    //     } else {
+    //       this.buildMask();
+    //     }
+    //   }
+    // }
   }
 
   //构建Video组件的通用Builder================================================================================
@@ -1266,7 +1020,7 @@ export struct VideoToLiveWallpaper {
 
     Video({ src: this.selectedVideoUri, controller: this.videoController, previewUri: this.pixelMapShow })
       .objectFit(useAspectRatio ? ImageFit.Cover : ImageFit.Contain)
-      .aspectRatio(useAspectRatio ? this.videoSacle : undefined)
+      .aspectRatio(useAspectRatio ? this.videoScale : undefined)
       .animation({
         duration: 400,
         curve: Curve.EaseInOut
@@ -1316,6 +1070,7 @@ export struct VideoToLiveWallpaper {
         this.currentOffsetOrigin = this.currentOffset
       })
 
+
   }
 
   //裁切后的遮罩
@@ -1334,20 +1089,20 @@ export struct VideoToLiveWallpaper {
           // 左侧遮罩（宽度为cropRect.x）
           Column()
             .width(this.X1)
-            .height(this.Y2-this.Y1)
+            .height(this.Y2 - this.Y1)
             .backgroundColor("rgba(0, 0, 0, 0.6)")
 
 
           // 中间留空（裁切区域，不遮罩）
           Column()
-            .width(this.X2-this.X1)
-            .height(this.Y2-this.Y1)
+            .width(this.X2 - this.X1)
+            .height(this.Y2 - this.Y1)
 
 
           // 右侧遮罩（剩余宽度）
           Column()
             .width(this.currentWidth - this.X2)
-            .height(this.Y2-this.Y1)
+            .height(this.Y2 - this.Y1)
             .backgroundColor("rgba(0, 0, 0, 0.6)")
 
         }
@@ -1406,7 +1161,7 @@ export struct VideoToLiveWallpaper {
   @Builder
   thumbnailShow() {
     Row() {
-      if (this.pixelMapInfoList.length > 0) {
+      if (this.pixelMapInfoList.length > 0 && this.isEditMode) {
         // 有视频时显示真实缩略图
         ForEach(this.pixelMapInfoList, (item: image.PixelMap, index: number) => {
           Image(item)
@@ -1639,27 +1394,6 @@ export struct VideoToLiveWallpaper {
           .strokeDashArray([2, 2])
         this.slider('100x')
       }
-
-      Row({ space: 48 }) {
-        Text('0.1x')
-          .fontColor('#ffb0b0b1')
-          .fontSize(12)
-        Text('1x')
-          .fontColor('#ffb0b0b1')
-          .fontSize(12)
-        Text('2x')
-          .fontColor('#ffb0b0b1')
-          .fontSize(12)
-        Text('5x')
-          .fontColor('#ffb0b0b1')
-          .fontSize(12)
-        Text('10x')
-          .fontColor('#ffb0b0b1')
-          .fontSize(12)
-        Text('100x')
-          .fontColor('#ffb0b0b1')
-          .fontSize(12)
-      }
     }
     .padding({
       left: 10,
@@ -1700,12 +1434,16 @@ export struct VideoToLiveWallpaper {
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
         .onClick(() => {
-          this.selectIndex = index
-          this.videoSacle = item.aspRatio
-          if (item.ratio) {
-            this.gifCropRatio = item.ratio
-          } else {
-            this.gifCropRatio = ''
+          if(item.aspRatio === -1&&!this.selectedVideoUri){
+            promptAction.showToast({message:'选中视频后，才可以使用'})
+          }else {
+            this.selectIndex = index
+            this.videoScale = item.aspRatio
+            if (item.ratio) {
+              this.gifCropRatio = item.ratio
+            } else {
+              this.gifCropRatio = ''
+            }
           }
         })
       })
@@ -1763,6 +1501,316 @@ export struct VideoToLiveWallpaper {
     .backgroundColor('#252525')
     .width('100%')
     .height('100%')
+  }
+
+  @Builder
+  SelectCrop() {
+    Row() {
+      Stack() {
+        Row() {
+          this.thumbnailShow()
+        }
+        .opacity(0.6)
+        .justifyContent(FlexAlign.Start)
+        .width('100%')
+        .height(THUMBNAIL_HEIGHT)
+
+        Row() {
+          Row() {
+            this.thumbnailShow()
+          }
+          .clip(true)
+          .justifyContent(FlexAlign.Start)
+          .width(this.rightWidth)
+          .height(THUMBNAIL_HEIGHT)
+        }
+        .justifyContent(FlexAlign.Start)
+        .width('100%')
+
+        Row() {
+          Row() {
+          }
+          .backgroundColor('rgba(0,0,0,0.6)')
+          .clip(true)
+          .justifyContent(FlexAlign.Start)
+          .width(this.leftWidth)
+          .height(THUMBNAIL_HEIGHT)
+        }
+        .justifyContent(FlexAlign.Start)
+
+        Row() {
+          Row() {
+            this.thumbnailShow()
+          }
+          .opacity(0.6)
+          .clip(true)
+          .justifyContent(FlexAlign.Start)
+          .width(this.leftWidth)
+          .height(THUMBNAIL_HEIGHT)
+        }
+        .justifyContent(FlexAlign.Start)
+
+        // 中间拖动区域：整体平移 startTime / endTime
+        Row() {
+        }
+        .width(this.rightWidth - this.leftWidth)
+        .height(THUMBNAIL_HEIGHT)
+        .offset({ x: this.leftWidth })
+        .border({ width: { top: 2, bottom: 2 }, color: Color.White })
+        .justifyContent(FlexAlign.Center)
+        .gesture(
+          PanGesture({ fingers: 1, distance: 1 })
+            .onActionStart(() => {
+              // 只在剪辑模式下且已选择视频时允许拖动
+              if (!this.isEditMode || !this.selectedVideoUri) {
+                return;
+              }
+              // 1. 拖动开始时立即暂停视频，防止播放时时间更新干扰
+              this.videoController.pause();
+              this.isVideoStart = false; // 标记视频已暂停
+              // 2. 保存拖动前的相对偏移比例
+              this.initialRelative = (this.currentTime - this.startTime) / (this.endTime - this.startTime);
+              // 3. 显示时间popup
+              this.showTimePopup = true;
+            })
+            .onActionUpdate(event => {
+              // 只在剪辑模式下且已选择视频时允许拖动
+              if (!this.isEditMode || !this.selectedVideoUri) {
+                return;
+              }
+              let deltaX = event.offsetX;
+              let newLeft = this.leftWidthOrigin + deltaX;
+              let newRight = this.rightWidthOrigin + deltaX;
+
+              if (newLeft >= 0 && newRight <= this.getTimelineWidth()) {
+                this.leftWidth = newLeft;
+                this.rightWidth = newRight;
+
+                // 更新 startTime / endTime
+                this.startTime = this.offsetToTime(this.leftWidth);
+                this.endTime = this.offsetToTime(this.rightWidth);
+
+                // 更新 currentTime 和 currentOffset
+                this.currentTime = this.startTime + this.initialRelative * (this.endTime - this.startTime);
+                this.currentOffset =
+                  this.leftWidth + this.initialRelative * (this.rightWidth - this.leftWidth);
+
+                // 移除频繁的视频时间更新，减少延迟
+                // this.videoController.setCurrentTime(Math.round(this.currentTime / 1000));
+              }
+            })
+            .onActionEnd(async () => {
+              // 只在剪辑模式下且已选择视频时处理拖动结束
+              if (!this.isEditMode || !this.selectedVideoUri) {
+                return;
+              }
+              this.leftWidthOrigin = this.leftWidth;
+              this.rightWidthOrigin = this.rightWidth;
+              // 拖动结束后自动从新区域开始播放：先暂停 -> 设置时间 -> 等待100ms -> 开始播放
+              this.videoController.pause();
+              this.isVideoStart = false;
+              this.videoController.setCurrentTime(Math.round(this.startTime / 1000), SeekMode.Accurate);
+              await new Promise<void>(r => setTimeout(r, 120));
+              this.videoController.start();
+              this.isVideoStart = true;
+              // 隐藏时间popup
+              this.showTimePopup = false;
+            })
+        )
+
+        // 左边按钮：控制 startTime
+        Text('|')
+          .fontWeight(800)
+          .fontColor(Color.Gray)
+          .textAlign(TextAlign.Center)
+          .borderRadius({ topLeft: 6, bottomLeft: 6 })
+          .backgroundColor(Color.White)
+          .height(THUMBNAIL_HEIGHT)
+          .width(16)
+          .offset({ x: this.leftWidth - 16 })
+          .gesture(
+            PanGesture({ fingers: 1, distance: 1 })
+              .onActionStart(() => {
+                // 只在剪辑模式下且已选择视频时允许拖动
+                if (!this.isEditMode || !this.selectedVideoUri) {
+                  return;
+                }
+                this.showTimePopup = true;
+              })
+              .onActionUpdate(async event => {
+                // 只在剪辑模式下且已选择视频时允许拖动
+                if (!this.isEditMode || !this.selectedVideoUri) {
+                  return;
+                }
+                let newLeftWidth = this.leftWidthOrigin + event.offsetX
+                let newStartTime = this.offsetToTime(newLeftWidth)
+
+                // 只在剪辑模式下应用时长限制
+                if (this.isEditMode) {
+                  // 限制最大时长
+                  if (this.endTime - newStartTime > MAX_DURATION) {
+                    newStartTime = this.endTime - MAX_DURATION
+                    newLeftWidth = this.timeToOffset(newStartTime)
+                  }
+
+                  // 限制最小时长
+                  if (this.endTime - newStartTime < MIN_DURATION) {
+                    newStartTime = this.endTime - MIN_DURATION
+                    newLeftWidth = this.timeToOffset(newStartTime)
+                  }
+                }
+
+                if (newLeftWidth >= 0 &&
+                  newLeftWidth + this.oneSecondWidth <= this.rightWidth &&
+                this.canDrag) {
+                  this.canDrag = false
+                  this.leftWidth = newLeftWidth
+                  this.startTime = newStartTime
+                  this.currentTime = this.startTime
+                  this.videoController.pause()
+                  this.isVideoStart = false
+                  this.videoController.setCurrentTime(Math.round(this.currentTime / 1000), SeekMode.Accurate)
+                  this.currentOffset = this.timeToOffset(this.currentTime)
+                  this.currentTimeShow = videoCropUtil.formatDuration(this.currentTime)
+                  if (!this.isPlayed) {
+                    this.pixelMapShow = await this.fetchFrameByTime(this.currentTime * 1000, false)
+                  }
+                  this.canDrag = true
+                }
+              })
+              .onActionEnd(() => {
+                // 只在剪辑模式下且已选择视频时处理拖动结束
+                if (!this.isEditMode || !this.selectedVideoUri) {
+                  return;
+                }
+                this.leftWidthOrigin = this.leftWidth
+                this.currentOffsetOrigin = this.currentOffset
+                this.showTimePopup = false;
+              })
+              .onActionCancel(() => {
+                // 只在剪辑模式下且已选择视频时处理拖动取消
+                if (!this.isEditMode || !this.selectedVideoUri) {
+                  return;
+                }
+                this.leftWidthOrigin = this.leftWidth
+                this.currentOffsetOrigin = this.currentOffset
+                this.showTimePopup = false;
+              })
+          )
+
+        // 右边按钮：控制 endTime
+        Text('|')
+          .fontWeight(800)
+          .fontColor(Color.Gray)
+          .textAlign(TextAlign.Center)
+          .borderRadius({ topRight: 6, bottomRight: 6 })
+          .backgroundColor(Color.White)
+          .height(THUMBNAIL_HEIGHT)
+          .width(16)
+          .offset({ x: this.rightWidth })
+          .gesture(
+            PanGesture({ fingers: 1, distance: 1 })
+              .onActionStart(() => {
+                // 只在剪辑模式下且已选择视频时允许拖动
+                if (!this.isEditMode || !this.selectedVideoUri) {
+                  return;
+                }
+                this.showTimePopup = true;
+              })
+              .onActionUpdate(async event => {
+                // 只在剪辑模式下且已选择视频时允许拖动
+                if (!this.isEditMode || !this.selectedVideoUri) {
+                  return;
+                }
+                let newRightWidth = this.rightWidthOrigin + event.offsetX
+                let newEndTime = this.offsetToTime(newRightWidth)
+
+                // 只在剪辑模式下应用时长限制
+                if (this.isEditMode) {
+                  // 限制最大时长
+                  if (newEndTime - this.startTime > MAX_DURATION) {
+                    newEndTime = this.startTime + MAX_DURATION
+                    newRightWidth = this.timeToOffset(newEndTime)
+                  }
+
+                  // 限制最小时长
+                  if (newEndTime - this.startTime < MIN_DURATION) {
+                    newEndTime = this.startTime + MIN_DURATION
+                    newRightWidth = this.timeToOffset(newEndTime)
+                  }
+                }
+
+                if (newRightWidth <= this.getTimelineWidth() &&
+                  newRightWidth >= this.leftWidth + this.oneSecondWidth &&
+                this.canDrag) {
+                  this.canDrag = false
+                  this.rightWidth = newRightWidth
+                  this.endTime = newEndTime
+                  this.currentTime = this.endTime
+                  this.videoController.pause()
+                  this.isVideoStart = false
+                  this.videoController.setCurrentTime(Math.round(this.currentTime / 1000), SeekMode.Accurate)
+                  this.currentOffset = this.timeToOffset(this.currentTime)
+                  this.currentTimeShow = videoCropUtil.formatDuration(this.currentTime)
+                  if (!this.isPlayed) {
+                    this.pixelMapShow = await this.fetchFrameByTime(this.currentTime * 1000, false)
+                  }
+                  this.canDrag = true
+                }
+              })
+              .onActionEnd(() => {
+                // 只在剪辑模式下且已选择视频时处理拖动结束
+                if (!this.isEditMode || !this.selectedVideoUri) {
+                  return;
+                }
+                this.rightWidthOrigin = this.rightWidth
+                this.currentOffsetOrigin = this.currentOffset
+                this.showTimePopup = false;
+              })
+              .onActionCancel(() => {
+                // 只在剪辑模式下且已选择视频时处理拖动取消
+                if (!this.isEditMode || !this.selectedVideoUri) {
+                  return;
+                }
+                this.rightWidthOrigin = this.rightWidth
+                this.currentOffsetOrigin = this.currentOffset
+                this.showTimePopup = false;
+              })
+          )
+
+        Row()
+          .backgroundColor(Color.White)
+          .width(2)
+          .height(THUMBNAIL_HEIGHT)
+          .offset({ x: this.currentOffset })
+      }
+      .width('83%')
+      .height(THUMBNAIL_HEIGHT)
+      .alignContent(Alignment.TopStart)
+      .bindPopup(this.showTimePopup, {
+        builder: this.timePopupBuilder,
+        placement: Placement.Top,
+        maskColor: 0x33000000,
+        popupColor: Color.White,
+        enableArrow: true,
+        showInSubWindow: false,
+        onStateChange: (e) => {
+          if (!e.isVisible) {
+            this.showTimePopup = false
+          }
+        }
+      })
+      .onClick(() => {
+        // 只有选择视频后才能显示时间popup
+        if (this.selectedVideoUri) {
+          this.showTimePopup = !this.showTimePopup
+        }
+      })
+    }
+    .justifyContent(FlexAlign.Center)
+    .width('100%')
+    .displayPriority(2)
+    .flexBasis('auto')
   }
 
   //非会员看到的小组件和壁纸的按钮
@@ -1902,10 +1950,10 @@ export struct VideoToLiveWallpaper {
     this.canvasContext.clearRect(0, 0, this.currentWidth, this.currentHeight)
 
     // 计算选择框的实际坐标（确保x1 < x2, y1 < y2）
-    this.X1 = Math.max(0,Math.min(this.startX, this.endX))
-    this.Y1 = Math.max(0,Math.min(this.startY, this.endY))
-    this.X2 = Math.min(this.currentWidth,Math.max(this.startX, this.endX))
-    this.Y2 = Math.min(this.currentHeight,Math.max(this.startY, this.endY))
+    this.X1 = Math.max(0, Math.min(this.startX, this.endX))
+    this.Y1 = Math.max(0, Math.min(this.startY, this.endY))
+    this.X2 = Math.min(this.currentWidth, Math.max(this.startX, this.endX))
+    this.Y2 = Math.min(this.currentHeight, Math.max(this.startY, this.endY))
 
     this.cropWidth = this.X2 - this.X1
     this.cropHeight = this.Y2 - this.Y1
@@ -2077,7 +2125,7 @@ export struct VideoToLiveWallpaper {
         const finalScale = `${this.gifClarity}:-1:flags=lanczos`;
 
         // 添加按比例剪裁功能 - 使用scale+crop组合确保兼容性
-        if (gifCropRatio&&cropInfo.width == 0) {
+        if (gifCropRatio) {
           let scaleAndCropFilter = '';
           switch (gifCropRatio) {
             case '4:3':
@@ -2132,11 +2180,9 @@ export struct VideoToLiveWallpaper {
           videoFilters =
             `[0:v]crop=${cropInfo.width}:${cropInfo.height}:${cropInfo.x}:${cropInfo.y},setpts=${speed}*PTS,fps=15,scale=${finalScale},split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`;
         } else {
-
           // 无裁剪时的滤镜链：帧率 -> 缩放 -> 调色板
           videoFilters =
             `[0:v]setpts=${speed}*PTS,fps=15,scale=${finalScale},split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`;
-
         }
 
         // 使用优化的FFmpeg命令生成高质量GIF

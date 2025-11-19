@@ -1,1 +1,1 @@
-{  "module": {    "name": "tool",    "type": "har",    "deviceTypes": [      "default",      "tablet",      "2in1"    ]  }}
+{  "module": {    "name": "tool",    "type": "har",    "deviceTypes": [      "default",      "tablet",      "2in1"    ],    "requestPermissions": [      {        "name": "ohos.permission.READ_MEDIA",        "reason": "$string:media",        "usedScene": {          "abilities": [            "EntryAbility"          ],          "when": "inuse"        }      }    ]  }}
