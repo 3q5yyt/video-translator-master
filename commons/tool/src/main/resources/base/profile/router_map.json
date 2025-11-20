@@ -1,0 +1,12 @@
+{
+  "routerMap": [
+    {
+      "name": "CropVideo",
+      "pageSourceFile": "src/main/ets/utilPage/CropVideo.ets",
+      "buildFunction": "CropVideoBuilder",
+      "data": {
+        "description": "this is PageHome"
+      }
+    }
+  ]
+}
