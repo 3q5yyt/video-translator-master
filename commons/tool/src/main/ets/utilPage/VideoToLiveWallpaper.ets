@@ -232,6 +232,8 @@ export struct VideoToLiveWallpaper {
     width: 0,
     height: 0
   };
+  @State private cropSelection: videoRect | null = null; // 已确认的裁切结果
+  @State private isCropMode: boolean = false; // 是否处于裁切模式
   private lastX: number = 0;
   private lastY: number = 0;
   private activeHandle: string = ''; // 'move' | 'lt' | 'rt' | 'lb' | 'rb'
@@ -301,6 +303,10 @@ export struct VideoToLiveWallpaper {
         await this.cleanupResources()
 
         this.selectedVideoUri = photoSelectResult.photoUris[0]
+        this.cropSelection = null
+        this.isCropMode = false
+        this.gifCropRatio = ''
+        this.videoScale = 0
 
         this.file = await fs.open(this.selectedVideoUri);
 
@@ -526,6 +532,10 @@ export struct VideoToLiveWallpaper {
         .margin({ top: 10, bottom: 10 })
         .backgroundColor('#141414')
         .displayPriority(2)
+
+        if (this.isCropMode) {
+          this.cropActionButtons()
+        }
 
         //视频播放时间区域
         Row() {
@@ -883,14 +893,7 @@ export struct VideoToLiveWallpaper {
           }
 
           // 初始化一个居中的裁剪框（80%大小）
-          const initW = this.previewWidth * 0.8
-          const initH = this.previewHeight * 0.8
-          this.cropRect = {
-            x: (this.previewWidth - initW) / 2,
-            y: (this.previewHeight - initH) / 2,
-            width: initW,
-            height: initH
-          }
+          this.resetCropRect()
 
           this.surfaceID = this.xComponentController.getXComponentSurfaceId();
           this.avPlayer = new AVPlayerDemo(this.surfaceID, 0);  // 创建AVPlayer实例
@@ -926,6 +929,22 @@ export struct VideoToLiveWallpaper {
         // 手势改变了 cropRect 之后，重画一次
         this.drawCropMask()
       })
+  }
+
+
+  private resetCropRect() {
+    if (this.previewWidth > 0 && this.previewHeight > 0) {
+      const initW = this.previewWidth * 0.8
+      const initH = this.previewHeight * 0.8
+      this.cropRect = {
+        x: (this.previewWidth - initW) / 2,
+        y: (this.previewHeight - initH) / 2,
+        width: initW,
+        height: initH
+      }
+    } else {
+      this.cropRect = { x: 0, y: 0, width: 0, height: 0 }
+    }
   }
 
 
@@ -1229,6 +1248,10 @@ export struct VideoToLiveWallpaper {
   private getCropResult():videoRect {
     const scale = this.scaleVideo   // 你初始化视频时算过的缩放比例
 
+    if (scale <= 0 || this.cropRect.width <= 0 || this.cropRect.height <= 0) {
+      return { x: 0, y: 0, width: 0, height: 0 }
+    }
+
     const cropX = Math.round(this.cropRect.x / scale)
     const cropY = Math.round(this.cropRect.y / scale)
     const cropW = Math.round(this.cropRect.width / scale)
@@ -1240,6 +1263,58 @@ export struct VideoToLiveWallpaper {
       width: cropW,
       height: cropH
     }
+  }
+
+
+  @Builder
+  private cropActionButtons() {
+    Row({ space: 12 }) {
+      Button('撤销裁切')
+        .type(ButtonType.Capsule)
+        .backgroundColor('#2b2b2b')
+        .fontColor(Color.White)
+        .onClick(() => this.cancelCropSelection())
+
+      Button('应用裁切')
+        .type(ButtonType.Capsule)
+        .backgroundColor('#ff298ae0')
+        .fontColor(Color.White)
+        .onClick(() => this.applyCropSelection())
+    }
+    .padding({ top: 8, bottom: 8 })
+    .justifyContent(FlexAlign.Center)
+    .width('100%')
+  }
+
+
+  private applyCropSelection() {
+    const crop = this.getCropResult()
+
+    if (crop.width <= 0 || crop.height <= 0) {
+      promptAction.showToast({ message: '请拖动裁切框选择区域' })
+      return
+    }
+
+    this.cropSelection = crop
+    this.isCropDone = true
+    this.cropDone = true
+    this.isSelecting = false
+    this.isCropMode = false
+    this.gifCropRatio = ''
+    this.videoScale = 0
+    promptAction.showToast({ message: '裁切区域已应用' })
+  }
+
+
+  private cancelCropSelection() {
+    this.cropSelection = null
+    this.isCropDone = false
+    this.cropDone = false
+    this.isSelecting = false
+    this.isCropMode = false
+    this.gifCropRatio = ''
+    this.videoScale = 0
+    this.resetCropRect()
   }
 
 
@@ -1607,10 +1682,26 @@ export struct VideoToLiveWallpaper {
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
         .onClick(() => {
-          if (item.aspRatio === -1 && !this.selectedVideoUri) {
-            promptAction.showToast({ message: '选中视频后，才可以使用' })
+          if (item.aspRatio === -1) {
+            if (!this.selectedVideoUri) {
+              promptAction.showToast({ message: '选中视频后，才可以使用' })
+              return
+            }
+
+            this.selectIndex = index
+            this.isSelecting = true
+            this.isCropMode = true
+            this.isCropDone = false
+            this.cropDone = false
+            this.cropSelection = null
+            this.gifCropRatio = ''
+            this.videoScale = item.aspRatio
+            this.resetCropRect()
           } else {
             this.selectIndex = index
+            this.isSelecting = false
+            this.isCropMode = false
+            this.cropSelection = null
             this.videoScale = item.aspRatio
             if (item.ratio) {
               this.gifCropRatio = item.ratio
@@ -2018,7 +2109,7 @@ export struct VideoToLiveWallpaper {
       destFile = await fileIo.open(albumUri, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE);
       console.info('目标文件已打开，可以开始后台生成GIF')
 
-      let cropValue=this.getCropResult()
+      const cropValue = this.cropSelection ?? this.getCropResult()
 
       // 生成GIF
       const gifPath = await this.createGifWithFFmpeg(
