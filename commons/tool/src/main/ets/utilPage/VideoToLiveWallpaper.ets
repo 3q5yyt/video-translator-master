@@ -251,7 +251,6 @@ export struct VideoToLiveWallpaper {
   @State isCropDone: boolean = false; //用于控制确定和撤销裁切
   @State cropDone: boolean = false; //用于控制buildMask显示
   private file: fileIo.File | null = null; // 视频文件描述符
-
   //================================================================================
   private context = this.getUIContext().getHostContext()!
   private videoController: VideoController = new VideoController() // 视频控制器
@@ -267,6 +266,8 @@ export struct VideoToLiveWallpaper {
     '10x': 0.1,
     '100x': 0.01
   }
+  pageInfos: NavPathStack = new NavPathStack();
+
 
   //设置状态栏颜色(深色，浅色)
   statusBarColor(model: boolean) {
@@ -438,406 +439,411 @@ export struct VideoToLiveWallpaper {
   }
 
   build() {
-    Column() {
-      //top栏目
-      Row() {
-        Row() {
-          Image($r('app.media.chevron_left'))
-            .fillColor(Color.White)
-            .width(40)
-            .height(40)
-            .margin({ right: 8 })
-            .padding(11.5)
-            .borderRadius(20)
-            .backgroundColor('#2F2F2F')
-            .onClick(() => {
-              this.nimblePathStack.pop()
-            })
-
-          Text('编辑')
-            .fontColor(Color.White)
-            .fontSize(20)
-            .fontWeight(FontWeight.Bold)
-        }
-        .justifyContent(FlexAlign.Start)
-        .transition(TransitionEffect.translate({ x: 50, y: 0 })
-          .animation({ duration: 500, curve: Curve.LinearOutSlowIn }))
-
-        Blank()
-        Button("保存")
-          .type(ButtonType.Normal)
-          .backgroundColor($r('app.color.shareButtonConfirm'))
-          .height(35)
-          .borderRadius(10)
-          .onClick(() => {
-            // 检查是否选择了视频
-            if (!this.selectedVideoUri) {
-              promptAction.showToast({
-                message: '请先选择视频',
-                duration: 2000
-              });
-              return;
-            }
-
-            // 如果参数调节面板正在显示，先收回
-            if (this.isShowParameterAdjustment) {
-              this.isShowParameterAdjustment = false;
-            }
-
-            // 切换保存选项显示状态
-            this.isShowSaveOptions = !this.isShowSaveOptions;
-          })
-      }
-      .padding({ left: 10, right: 10 })
-      .width('100%')
-      .flexBasis('auto')
-
+    Navigation(this.pageInfos) {
       Column() {
-        //视频播放区域
-        Stack({ alignContent: Alignment.Center }) {
-          //自动登录相关算法
-          // unifiedLoginComPanel({
-          //   show: this.isShowSheet
-          // })
-          //点击添加视频的按钮
-          Row() {
-            this.selectVideoButton()
-          }
-          .visibility(!this.selectedVideoUri ? Visibility.Visible : Visibility.Hidden)
-          .transition(TransitionEffect.scale({ x: 0.2, y: 0.2 }).animation({ curve: curves.springMotion(0.6, 0.8) }))
-
-          //video组件播放视频 - 使用条件渲染解决aspectRatio重置问题
-          if (this.videoScale === 0) {
-            // 默认比例：不设置aspectRatio，让视频保持原始比例
-            this.buildVideoComponent(false)
-          } else if (this.videoScale === -1) {
-            this.cropVideoComponent()
-          } else {
-            // 指定比例：设置aspectRatio
-            this.buildVideoComponent(true)
-          }
-        }
-        .onSizeChange((oldValue: SizeOptions, newValue: SizeOptions) => {
-          this.currentWidth = Number(newValue.width)
-          this.currentHeight = Number(newValue.height)
-        })
-        .height('65%')
-        .width('100%')
-        .margin({ top: 10, bottom: 10 })
-        .backgroundColor('#141414')
-        .displayPriority(2)
-
-        //视频播放时间区域
+        //top栏目
         Row() {
-          // 根据模式显示不同的时间信息
-          if (this.isEditMode) {
-            // 剪辑模式：显示当前播放时间和选中区域的结束时间
-            Text(videoCropUtil.formatDuration(this.currentTime) + ' | ')
-              .timeText()
-            Text(videoCropUtil.formatDuration(this.endTime))
-              .timeText()
-          } else {
-            // 普通模式：显示当前播放时间和总时长
-            Text(this.currentTimeShow + ' | ')
-              .timeText()
-            Text(this.fullTimeShow)
-              .timeText()
+          Row() {
+            Image($r('app.media.chevron_left'))
+              .fillColor(Color.White)
+              .width(40)
+              .height(40)
+              .margin({ right: 8 })
+              .padding(11.5)
+              .borderRadius(20)
+              .backgroundColor('#2F2F2F')
+              .onClick(() => {
+                this.nimblePathStack.pop()
+              })
+
+            Text('编辑')
+              .fontColor(Color.White)
+              .fontSize(20)
+              .fontWeight(FontWeight.Bold)
           }
+          .justifyContent(FlexAlign.Start)
+          .transition(TransitionEffect.translate({ x: 50, y: 0 })
+            .animation({ duration: 500, curve: Curve.LinearOutSlowIn }))
 
           Blank()
-
-          Image(this.selectedVideoUri ? (this.isVideoStart ? $r('app.media.pause') : $r('app.media.play_fill')) :
-          $r('app.media.pause'))
-            .width(20)
-            .height(20)
-            .opacity(this.selectedVideoUri ? 1 : 0.5) // 没有视频时显示为半透明
-            .onClick(async () => {
-              // 如果没有选择视频，不执行任何操作
+          Button("保存")
+            .type(ButtonType.Normal)
+            .backgroundColor($r('app.color.shareButtonConfirm'))
+            .height(35)
+            .borderRadius(10)
+            .onClick(() => {
+              // 检查是否选择了视频
               if (!this.selectedVideoUri) {
-                console.log('没有选择视频，播放按钮无效');
+                promptAction.showToast({
+                  message: '请先选择视频',
+                  duration: 2000
+                });
                 return;
               }
 
-              if (this.isVideoStart) {
-                // 当前正在播放，点击暂停
-                console.log('暂停播放');
-                this.videoController.pause();
-                this.isVideoStart = false;
-              } else {
-                // 当前已暂停，点击播放
-                console.log('开始播放');
-                // 如果当前时间已经到达结束时间，从开始时间重新播放
-                if (this.currentTime >= this.endTime - 100) { // 100ms容差
-                  const startTimeSeconds = Math.round(this.startTime / 1000);
-                  console.log('从开始时间重新播放：', startTimeSeconds, '秒');
-                  this.videoController.setCurrentTime(startTimeSeconds, SeekMode.Accurate);
-                  this.currentTime = this.startTime;
-                  this.currentOffset = this.timeToOffset(this.startTime);
-                  this.currentOffsetOrigin = this.currentOffset;
-                  await new Promise<void>(r => setTimeout(r, 120));
-                }
-                this.videoController.start();
-                this.isVideoStart = true;
+              // 如果参数调节面板正在显示，先收回
+              if (this.isShowParameterAdjustment) {
+                this.isShowParameterAdjustment = false;
               }
+
+              // 切换保存选项显示状态
+              this.isShowSaveOptions = !this.isShowSaveOptions;
             })
         }
-        .width('100%')
         .padding({ left: 10, right: 10 })
-        .margin({ bottom: 10 })
+        .width('100%')
         .flexBasis('auto')
-        .displayPriority(2)
 
         Column() {
-          //参数调节选择区域
-          Row() {
-            if (this.AdjustParameters == AdjustableParameters.Proportion) {
-              this.SelectRatio()
-            } else if (this.AdjustParameters == AdjustableParameters.Clarity) {
-              this.SelectClarity()
-            } else if (this.AdjustParameters == AdjustableParameters.Speed) {
-              this.SelectSpeed()
-            } else if (this.AdjustParameters == AdjustableParameters.Crop) {
-              this.SelectCrop()
+          //视频播放区域
+          Stack({ alignContent: Alignment.Center }) {
+            //自动登录相关算法
+            // unifiedLoginComPanel({
+            //   show: this.isShowSheet
+            // })
+            //点击添加视频的按钮
+            Row() {
+              this.selectVideoButton()
+            }
+            .visibility(!this.selectedVideoUri ? Visibility.Visible : Visibility.Hidden)
+            .transition(TransitionEffect.scale({ x: 0.2, y: 0.2 }).animation({ curve: curves.springMotion(0.6, 0.8) }))
+
+            //video组件播放视频 - 使用条件渲染解决aspectRatio重置问题
+            if (this.videoScale === 0) {
+              // 默认比例：不设置aspectRatio，让视频保持原始比例
+              this.buildVideoComponent(false)
+            } else if (this.videoScale === -1) {
+              this.cropVideoComponent()
+            } else {
+              // 指定比例：设置aspectRatio
+              this.buildVideoComponent(true)
             }
           }
-          .width('100%')
-          .padding({
-            left: 10,
-            right: 10,
-            top: 20,
-            bottom: 20
+          .onSizeChange((oldValue: SizeOptions, newValue: SizeOptions) => {
+            this.currentWidth = Number(newValue.width)
+            this.currentHeight = Number(newValue.height)
           })
-          .height(110)
-          .visibility((this.isShowParameterAdjustment && this.videoStyle !== VideoToAnimationStyle.LIVE) ?
-          Visibility.Visible : Visibility.Hidden)
-          .transition(TransitionEffect.translate({ y: '100%' }))
-          .animation({ duration: 340, curve: Curve.EaseInOut })
-          .margin({ bottom: 6 })
+          .height('65%')
+          .width('100%')
+          .margin({ top: 10, bottom: 10 })
+          .backgroundColor('#141414')
+          .displayPriority(2)
 
-          //底部按钮
+          //视频播放时间区域
           Row() {
-            if (!this.isShowSaveOptions) {
-              //参数调节按钮区域 - 在LIVE模式下隐藏
-              if (this.videoStyle !== VideoToAnimationStyle.LIVE) {
-                Column() {
-                  Divider()
-                    .color(Color.Gray)
-                    .strokeWidth(1.5)
-                    .margin({ bottom: 4 })
-                  Row({ space: 20 }) {
-                    //调节GIF分辨率按钮（仅GIF模式显示）
-                    if (this.videoStyle == VideoToAnimationStyle.GIF) {
-                      Column({ space: 3 }) {
-                        Image(this.AdjustParameters === AdjustableParameters.Clarity ?
-                        $r('app.media.resolution_select') : $r('app.media.resolution'))
-                          .width(24)
-                          .height(24)
-                          .objectFit(1)
-                          .margin({ bottom: 4 })
-                        Text('分辨率')
-                          .fontColor(Color.White)
-                          .fontWeight(500)
-                          .fontSize(10)
-                      }
-                      .onClick(() => {
-                        // 显示清晰度参数调节
-                        if (this.isShowParameterAdjustment && this.AdjustParameters === AdjustableParameters.Clarity) {
-                          // 如果当前已显示清晰度参数，则隐藏
-                          this.isShowParameterAdjustment = false
-                        } else {
-                          // 否则显示清晰度参数
-                          this.videoScale = 0
-                          this.isShowParameterAdjustment = true
-                          this.AdjustParameters = AdjustableParameters.Clarity
-                        }
-                      })
-                    }
-                    // 裁切按钮（仅GIF模式显示）
-                    if (this.videoStyle == VideoToAnimationStyle.GIF) {
-                      Column({ space: 3 }) {
-                        Image(this.AdjustParameters === AdjustableParameters.Crop ? $r('app.media.cut_selects') :
-                        $r('app.media.cut'))
-                          .width(24)
-                          .height(24)
-                          .objectFit(1)
-                          .margin({ bottom: 4 })
-                        Text('裁切')
-                          .fontColor(Color.White)
-                          .fontWeight(500)
-                          .fontSize(10)
-                          .maxLines(1)
-                      }
-                      .onClick(() => {
-                        if (this.isShowParameterAdjustment &&
-                          this.AdjustParameters === AdjustableParameters.Crop) {
-                          this.isShowParameterAdjustment = false
-                        } else {
-                          this.videoScale = 0
-                          this.isEditMode = true
-                          this.isShowParameterAdjustment = true
-                          this.AdjustParameters = AdjustableParameters.Crop
-                        }
-                      })
-                    }
-                    // 比例选择按钮（仅GIF模式显示）
-                    if (this.videoStyle == VideoToAnimationStyle.GIF) {
-                      Column({ space: 3 }) {
-                        Image(this.AdjustParameters === AdjustableParameters.Proportion ?
-                        $r('app.media.proportion_select') : $r('app.media.proportion'))
-                          .width(24)
-                          .height(24)
-                          .objectFit(1)
-                          .margin({ bottom: 4 })
-                        Text(this.gifCropRatio || '比例')
-                          .fontColor(Color.White)
-                          .fontWeight(500)
-                          .fontSize(10)
-                          .maxLines(1)
-                      }
-                      .onClick(() => {
-                        // 显示比例选择
-                        if (this.isShowParameterAdjustment &&
-                          this.AdjustParameters === AdjustableParameters.Proportion) {
-                          // 如果当前已显示比例参数，则隐藏
-                          this.isShowParameterAdjustment = false
-                        } else {
-                          // 否则显示比例参数
-                          this.isShowParameterAdjustment = true
-                          this.AdjustParameters = AdjustableParameters.Proportion
-                        }
-                      })
-                    }
-                    if (this.videoStyle == VideoToAnimationStyle.GIF) {
-                      Column({ space: 3 }) {
-                        Image(this.AdjustParameters === AdjustableParameters.Speed ? $r('app.media.speed_selects') :
-                        $r('app.media.speed'))
-                          .width(24)
-                          .height(24)
-                          .objectFit(1)
-                          .margin({ bottom: 4 })
-                        Text('速率')
-                          .fontColor(Color.White)
-                          .fontWeight(500)
-                          .fontSize(10)
-                          .maxLines(1)
-                      }
-                      .onClick(() => {
-                        // 显示比例选择
-                        if (this.isShowParameterAdjustment &&
-                          this.AdjustParameters === AdjustableParameters.Speed) {
-                          // 如果当前已显示比例参数，则隐藏
-                          this.isShowParameterAdjustment = false
-                        } else {
-                          this.videoScale = 0 //======================= 明天修改要求  只将自定义功能隔离出来==================//
-                          this.isShowParameterAdjustment = true
-                          this.AdjustParameters = AdjustableParameters.Speed
-                        }
-                      })
-                    }
+            // 根据模式显示不同的时间信息
+            if (this.isEditMode) {
+              // 剪辑模式：显示当前播放时间和选中区域的结束时间
+              Text(videoCropUtil.formatDuration(this.currentTime) + ' | ')
+                .timeText()
+              Text(videoCropUtil.formatDuration(this.endTime))
+                .timeText()
+            } else {
+              // 普通模式：显示当前播放时间和总时长
+              Text(this.currentTimeShow + ' | ')
+                .timeText()
+              Text(this.fullTimeShow)
+                .timeText()
+            }
+
+            Blank()
+
+            Image(this.selectedVideoUri ? (this.isVideoStart ? $r('app.media.pause') : $r('app.media.play_fill')) :
+            $r('app.media.pause'))
+              .width(20)
+              .height(20)
+              .opacity(this.selectedVideoUri ? 1 : 0.5) // 没有视频时显示为半透明
+              .onClick(async () => {
+                // 如果没有选择视频，不执行任何操作
+                if (!this.selectedVideoUri) {
+                  console.log('没有选择视频，播放按钮无效');
+                  return;
+                }
+
+                if (this.isVideoStart) {
+                  // 当前正在播放，点击暂停
+                  console.log('暂停播放');
+                  this.videoController.pause();
+                  this.isVideoStart = false;
+                } else {
+                  // 当前已暂停，点击播放
+                  console.log('开始播放');
+                  // 如果当前时间已经到达结束时间，从开始时间重新播放
+                  if (this.currentTime >= this.endTime - 100) { // 100ms容差
+                    const startTimeSeconds = Math.round(this.startTime / 1000);
+                    console.log('从开始时间重新播放：', startTimeSeconds, '秒');
+                    this.videoController.setCurrentTime(startTimeSeconds, SeekMode.Accurate);
+                    this.currentTime = this.startTime;
+                    this.currentOffset = this.timeToOffset(this.startTime);
+                    this.currentOffsetOrigin = this.currentOffset;
+                    await new Promise<void>(r => setTimeout(r, 120));
                   }
+                  this.videoController.start();
+                  this.isVideoStart = true;
+                }
+              })
+          }
+          .width('100%')
+          .padding({ left: 10, right: 10 })
+          .margin({ bottom: 10 })
+          .flexBasis('auto')
+          .displayPriority(2)
+
+          Column() {
+            //参数调节选择区域
+            Row() {
+              if (this.AdjustParameters == AdjustableParameters.Proportion) {
+                this.SelectRatio()
+              } else if (this.AdjustParameters == AdjustableParameters.Clarity) {
+                this.SelectClarity()
+              } else if (this.AdjustParameters == AdjustableParameters.Speed) {
+                this.SelectSpeed()
+              } else if (this.AdjustParameters == AdjustableParameters.Crop) {
+                this.SelectCrop()
+              }
+            }
+            .width('100%')
+            .padding({
+              left: 10,
+              right: 10,
+              top: 20,
+              bottom: 20
+            })
+            .height(110)
+            .visibility((this.isShowParameterAdjustment && this.videoStyle !== VideoToAnimationStyle.LIVE) ?
+            Visibility.Visible : Visibility.Hidden)
+            .transition(TransitionEffect.translate({ y: '100%' }))
+            .animation({ duration: 340, curve: Curve.EaseInOut })
+            .margin({ bottom: 6 })
+
+            //底部按钮
+            Row() {
+              if (!this.isShowSaveOptions) {
+                //参数调节按钮区域 - 在LIVE模式下隐藏
+                if (this.videoStyle !== VideoToAnimationStyle.LIVE) {
+                  Column() {
+                    Divider()
+                      .color(Color.Gray)
+                      .strokeWidth(1.5)
+                      .margin({ bottom: 4 })
+                    Row({ space: 20 }) {
+                      //调节GIF分辨率按钮（仅GIF模式显示）
+                      if (this.videoStyle == VideoToAnimationStyle.GIF) {
+                        Column({ space: 3 }) {
+                          Image(this.AdjustParameters === AdjustableParameters.Clarity ?
+                          $r('app.media.resolution_select') : $r('app.media.resolution'))
+                            .width(24)
+                            .height(24)
+                            .objectFit(1)
+                            .margin({ bottom: 4 })
+                          Text('分辨率')
+                            .fontColor(Color.White)
+                            .fontWeight(500)
+                            .fontSize(10)
+                        }
+                        .onClick(() => {
+                          // 显示清晰度参数调节
+                          if (this.isShowParameterAdjustment &&
+                            this.AdjustParameters === AdjustableParameters.Clarity) {
+                            // 如果当前已显示清晰度参数，则隐藏
+                            this.isShowParameterAdjustment = false
+                          } else {
+                            // 否则显示清晰度参数
+                            this.videoScale = 0
+                            this.isShowParameterAdjustment = true
+                            this.AdjustParameters = AdjustableParameters.Clarity
+                          }
+                        })
+                      }
+                      // 裁切按钮（仅GIF模式显示）
+                      if (this.videoStyle == VideoToAnimationStyle.GIF) {
+                        Column({ space: 3 }) {
+                          Image(this.AdjustParameters === AdjustableParameters.Crop ? $r('app.media.cut_selects') :
+                          $r('app.media.cut'))
+                            .width(24)
+                            .height(24)
+                            .objectFit(1)
+                            .margin({ bottom: 4 })
+                          Text('裁切')
+                            .fontColor(Color.White)
+                            .fontWeight(500)
+                            .fontSize(10)
+                            .maxLines(1)
+                        }
+                        .onClick(() => {
+                          if (this.isShowParameterAdjustment &&
+                            this.AdjustParameters === AdjustableParameters.Crop) {
+                            this.isShowParameterAdjustment = false
+                          } else {
+
+                            this.videoScale = 0
+                            this.isEditMode = true
+                            this.isShowParameterAdjustment = true
+                            this.AdjustParameters = AdjustableParameters.Crop
+                          }
+                        })
+                      }
+                      // 比例选择按钮（仅GIF模式显示）
+                      if (this.videoStyle == VideoToAnimationStyle.GIF) {
+                        Column({ space: 3 }) {
+                          Image(this.AdjustParameters === AdjustableParameters.Proportion ?
+                          $r('app.media.proportion_select') : $r('app.media.proportion'))
+                            .width(24)
+                            .height(24)
+                            .objectFit(1)
+                            .margin({ bottom: 4 })
+                          Text(this.gifCropRatio || '比例')
+                            .fontColor(Color.White)
+                            .fontWeight(500)
+                            .fontSize(10)
+                            .maxLines(1)
+                        }
+                        .onClick(() => {
+                          // 显示比例选择
+                          if (this.isShowParameterAdjustment &&
+                            this.AdjustParameters === AdjustableParameters.Proportion) {
+                            // 如果当前已显示比例参数，则隐藏
+                            this.isShowParameterAdjustment = false
+                          } else {
+                            // 否则显示比例参数
+                            this.pageInfos.pushPath({ name: 'CropVideo' });
+                            this.isShowParameterAdjustment = true
+                            this.AdjustParameters = AdjustableParameters.Proportion
+                          }
+                        })
+                      }
+                      if (this.videoStyle == VideoToAnimationStyle.GIF) {
+                        Column({ space: 3 }) {
+                          Image(this.AdjustParameters === AdjustableParameters.Speed ? $r('app.media.speed_selects') :
+                          $r('app.media.speed'))
+                            .width(24)
+                            .height(24)
+                            .objectFit(1)
+                            .margin({ bottom: 4 })
+                          Text('速率')
+                            .fontColor(Color.White)
+                            .fontWeight(500)
+                            .fontSize(10)
+                            .maxLines(1)
+                        }
+                        .onClick(() => {
+                          // 显示比例选择
+                          if (this.isShowParameterAdjustment &&
+                            this.AdjustParameters === AdjustableParameters.Speed) {
+                            // 如果当前已显示比例参数，则隐藏
+                            this.isShowParameterAdjustment = false
+                          } else {
+                            this.videoScale = 0 //======================= 明天修改要求  只将自定义功能隔离出来==================//
+                            this.isShowParameterAdjustment = true
+                            this.AdjustParameters = AdjustableParameters.Speed
+                          }
+                        })
+                      }
+                    }
+                    .width('100%')
+                    .padding({ left: 10, right: 10 })
+                    .justifyContent(FlexAlign.SpaceAround)
+                  }
+                  .backgroundColor('#1c1c1c')
+                  .zIndex(2)
+                  .clip(true)
+                  .width('100%')
+                  .height('100%')
+                }
+              } else {
+                //保存选项区域 - 使用已有的builder
+                if (this.videoStyle == VideoToAnimationStyle.LIVE) {
+                  //保存为动态壁纸
+                  Column() {
+                    Row() {
+                      if ((!this.isVip) && this.VideoEditing < 2) {
+                        this.buildActionButton(false)
+                      } else {
+                        Stack() {
+                          this.buildActionButton(true)
+                          SaveButton(this.saveButtonOptions)
+                            .borderRadius(20)
+                            .backgroundColor('#20000000')
+                            .height(50)
+                            .onClick(async (event, result: SaveButtonOnClickResult) => {
+                              if (result == SaveButtonOnClickResult.SUCCESS) {
+                                await this.saveAsMovingPhoto()
+                              } else {
+                                promptAction.showToast({
+                                  message: '需要授权才能保存动态壁纸',
+                                  duration: 2000
+                                })
+                              }
+                            })
+                            .width('80%')
+                        }
+                      }
+                    }
+                    .justifyContent(FlexAlign.Center)
+                    .width('100%')
+                  }
+                  .height('100%')
                   .width('100%')
                   .padding({ left: 10, right: 10 })
-                  .justifyContent(FlexAlign.SpaceAround)
-                }
-                .backgroundColor('#1c1c1c')
-                .zIndex(2)
-                .clip(true)
-                .width('100%')
-                .height('100%')
-              }
-            } else {
-              //保存选项区域 - 使用已有的builder
-              if (this.videoStyle == VideoToAnimationStyle.LIVE) {
-                //保存为动态壁纸
-                Column() {
-                  Row() {
-                    if ((!this.isVip) && this.VideoEditing < 2) {
-                      this.buildActionButton(false)
-                    } else {
-                      Stack() {
-                        this.buildActionButton(true)
-                        SaveButton(this.saveButtonOptions)
-                          .borderRadius(20)
-                          .backgroundColor('#20000000')
-                          .height(50)
-                          .onClick(async (event, result: SaveButtonOnClickResult) => {
-                            if (result == SaveButtonOnClickResult.SUCCESS) {
-                              await this.saveAsMovingPhoto()
-                            } else {
-                              promptAction.showToast({
-                                message: '需要授权才能保存动态壁纸',
-                                duration: 2000
-                              })
-                            }
-                          })
-                          .width('80%')
+                } else if (this.videoStyle == VideoToAnimationStyle.GIF) {
+                  //保存为GIF
+                  Column() {
+                    Row() {
+                      if ((!this.isVip) && this.VideoEditing < 2) {
+                        this.buildActionButton(false)
+                      } else {
+                        Stack() {
+                          this.buildActionButton(true)
+                          SaveButton(this.saveButtonOptions)
+                            .borderRadius(20)
+                            .backgroundColor('#20000000')
+                            .height(50)
+                            .onClick(async (event, result: SaveButtonOnClickResult) => {
+                              if (result == SaveButtonOnClickResult.SUCCESS) {
+                                await this.saveAsGifWithPermission()
+                              } else {
+                                promptAction.showToast({
+                                  message: '需要授权才能保存GIF',
+                                  duration: 2000
+                                })
+                              }
+                            })
+                            .width('80%')
+                        }
                       }
                     }
+                    .justifyContent(FlexAlign.Center)
+                    .width('100%')
                   }
-                  .justifyContent(FlexAlign.Center)
+                  .height('100%')
                   .width('100%')
+                  .padding({ left: 10, right: 10 })
                 }
-                .height('100%')
-                .width('100%')
-                .padding({ left: 10, right: 10 })
-              } else if (this.videoStyle == VideoToAnimationStyle.GIF) {
-                //保存为GIF
-                Column() {
-                  Row() {
-                    if ((!this.isVip) && this.VideoEditing < 2) {
-                      this.buildActionButton(false)
-                    } else {
-                      Stack() {
-                        this.buildActionButton(true)
-                        SaveButton(this.saveButtonOptions)
-                          .borderRadius(20)
-                          .backgroundColor('#20000000')
-                          .height(50)
-                          .onClick(async (event, result: SaveButtonOnClickResult) => {
-                            if (result == SaveButtonOnClickResult.SUCCESS) {
-                              await this.saveAsGifWithPermission()
-                            } else {
-                              promptAction.showToast({
-                                message: '需要授权才能保存GIF',
-                                duration: 2000
-                              })
-                            }
-                          })
-                          .width('80%')
-                      }
-                    }
-                  }
-                  .justifyContent(FlexAlign.Center)
-                  .width('100%')
-                }
-                .height('100%')
-                .width('100%')
-                .padding({ left: 10, right: 10 })
               }
             }
+            .width('100%')
+            .height('100%')
+            .justifyContent(FlexAlign.Start)
           }
+          .justifyContent(FlexAlign.End)
           .width('100%')
-          .height('100%')
-          .justifyContent(FlexAlign.Start)
+          .flexBasis('auto')
+          .height(180)
+          .displayPriority(2)
         }
-        .justifyContent(FlexAlign.End)
-        .width('100%')
-        .flexBasis('auto')
-        .height(180)
-        .displayPriority(2)
+        .justifyContent(FlexAlign.SpaceBetween)
+        .flexGrow(1)
+        .flexShrink(1)
+
+
+        // .flexBasis('auto')
       }
-      .justifyContent(FlexAlign.SpaceBetween)
-      .flexGrow(1)
-      .flexShrink(1)
-
-
-      // .flexBasis('auto')
+      .padding({ top: this.topRectHeight, bottom: this.bottomRectHeight })
+      .width('100%')
+      .height('100%')
+      .alignItems(HorizontalAlign.Start)
+      .justifyContent(FlexAlign.Start)
     }
-    .padding({ top: this.topRectHeight, bottom: this.bottomRectHeight })
-    .width('100%')
-    .height('100%')
-    .alignItems(HorizontalAlign.Start)
-    .justifyContent(FlexAlign.Start)
   }
 
   @Builder
@@ -850,11 +856,11 @@ export struct VideoToLiveWallpaper {
         controller: this.xComponentController
       })
         .onLoad(async () => {
-          this.isOr = await videoCropUtil.getVideoOrientation(this.selectedVideoUri, this.context)   //判断视频是否旋转
+          this.isOr = await videoCropUtil.getVideoOrientation(this.selectedVideoUri, this.context) //判断视频是否旋转
           let w = this.videoSize.photoSize.width
           let h = this.videoSize.photoSize.height
 
-          if (this.isOr) {   // 如果视频是旋转的，将宽高置换
+          if (this.isOr) { // 如果视频是旋转的，将宽高置换
             h = this.videoSize.photoSize.width
             w = this.videoSize.photoSize.height
           }
@@ -893,8 +899,8 @@ export struct VideoToLiveWallpaper {
           }
 
           this.surfaceID = this.xComponentController.getXComponentSurfaceId();
-          this.avPlayer = new AVPlayerDemo(this.surfaceID, 0);  // 创建AVPlayer实例
-          this.avPlayer.avPlayerUrlDemo(this.file?.fd)          // 将已经视频文件描述符传给AVPlayer用于打开视频
+          this.avPlayer = new AVPlayerDemo(this.surfaceID, 0); // 创建AVPlayer实例
+          this.avPlayer.avPlayerUrlDemo(this.file?.fd) // 将已经视频文件描述符传给AVPlayer用于打开视频
         })
         // XComponent 在 UI 上也用同样的大小
         .width(this.previewWidth || '100%')
@@ -928,17 +934,24 @@ export struct VideoToLiveWallpaper {
       })
   }
 
-
   private hitTestHandle(x: number, y: number): string {
     const r = this.cropRect
-    const handleSize = 30  // 角 handle 半径
-    const edgeThickness = 20  // 边 handle 的点击高度/宽度
+    const handleSize = 30 // 角 handle 半径
+    const edgeThickness = 20 // 边 handle 的点击高度/宽度
 
     // 四角
-    if (Math.abs(x - r.x) < handleSize && Math.abs(y - r.y) < handleSize) return 'lt'
-    if (Math.abs(x - (r.x + r.width)) < handleSize && Math.abs(y - r.y) < handleSize) return 'rt'
-    if (Math.abs(x - r.x) < handleSize && Math.abs(y - (r.y + r.height)) < handleSize) return 'lb'
-    if (Math.abs(x - (r.x + r.width)) < handleSize && Math.abs(y - (r.y + r.height)) < handleSize) return 'rb'
+    if (Math.abs(x - r.x) < handleSize && Math.abs(y - r.y) < handleSize) {
+      return 'lt'
+    }
+    if (Math.abs(x - (r.x + r.width)) < handleSize && Math.abs(y - r.y) < handleSize) {
+      return 'rt'
+    }
+    if (Math.abs(x - r.x) < handleSize && Math.abs(y - (r.y + r.height)) < handleSize) {
+      return 'lb'
+    }
+    if (Math.abs(x - (r.x + r.width)) < handleSize && Math.abs(y - (r.y + r.height)) < handleSize) {
+      return 'rb'
+    }
 
     // 上边中段
     if (Math.abs(y - r.y) < edgeThickness && x > r.x + handleSize && x < r.x + r.width - handleSize) {
@@ -958,11 +971,12 @@ export struct VideoToLiveWallpaper {
     }
 
     // 框内拖动
-    if (x > r.x && x < r.x + r.width && y > r.y && y < r.y + r.height) return 'move'
+    if (x > r.x && x < r.x + r.width && y > r.y && y < r.y + r.height) {
+      return 'move'
+    }
 
     return ''
   }
-
 
   private updateCropRect(dx: number, dy: number) {
     const maxW: number = this.previewWidth
@@ -1012,10 +1026,13 @@ export struct VideoToLiveWallpaper {
     }
     // ========== 2. 缩放 ==========
     else if (this.resizing) {
-      const dragLeft: boolean   = (this.activeHandle === 'lt' || this.activeHandle === 'lb' || this.activeHandle === 'left')
-      const dragRight: boolean  = (this.activeHandle === 'rt' || this.activeHandle === 'rb' || this.activeHandle === 'right')
-      const dragTop: boolean    = (this.activeHandle === 'lt' || this.activeHandle === 'rt' || this.activeHandle === 'top')
-      const dragBottom: boolean = (this.activeHandle === 'lb' || this.activeHandle === 'rb' || this.activeHandle === 'bottom')
+      const dragLeft: boolean =
+        (this.activeHandle === 'lt' || this.activeHandle === 'lb' || this.activeHandle === 'left')
+      const dragRight: boolean =
+        (this.activeHandle === 'rt' || this.activeHandle === 'rb' || this.activeHandle === 'right')
+      const dragTop: boolean = (this.activeHandle === 'lt' || this.activeHandle === 'rt' || this.activeHandle === 'top')
+      const dragBottom: boolean =
+        (this.activeHandle === 'lb' || this.activeHandle === 'rb' || this.activeHandle === 'bottom')
 
       // 先根据拖拽修改边
       if (dragLeft) {
@@ -1132,7 +1149,7 @@ export struct VideoToLiveWallpaper {
     ctx.stroke()
 
     // 4. 四个直角边角
-    const cornerLen = 22  // 边角线长度
+    const cornerLen = 22 // 边角线长度
     ctx.lineWidth = 3
 
     // 左上角
@@ -1226,8 +1243,8 @@ export struct VideoToLiveWallpaper {
     }
   }
 
-  private getCropResult():videoRect {
-    const scale = this.scaleVideo   // 你初始化视频时算过的缩放比例
+  private getCropResult(): videoRect {
+    const scale = this.scaleVideo // 你初始化视频时算过的缩放比例
 
     const cropX = Math.round(this.cropRect.x / scale)
     const cropY = Math.round(this.cropRect.y / scale)
@@ -1241,10 +1258,6 @@ export struct VideoToLiveWallpaper {
       height: cropH
     }
   }
-
-
-
-
 
   //构建Video组件的通用Builder================================================================================
   @Builder
@@ -2018,7 +2031,7 @@ export struct VideoToLiveWallpaper {
       destFile = await fileIo.open(albumUri, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE);
       console.info('目标文件已打开，可以开始后台生成GIF')
 
-      let cropValue=this.getCropResult()
+      let cropValue = this.getCropResult()
 
       // 生成GIF
       const gifPath = await this.createGifWithFFmpeg(
@@ -2088,7 +2101,6 @@ export struct VideoToLiveWallpaper {
     }
     return (offset / timelineWidth) * this.fullTime
   }
-
 
   /**
    * 将GIF文件内容写入已打开的相册文件
