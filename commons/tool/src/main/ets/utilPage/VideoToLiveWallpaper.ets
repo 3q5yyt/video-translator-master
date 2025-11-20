@@ -224,35 +224,34 @@ export struct VideoToLiveWallpaper {
   //=====================================================================视频裁切=====================
 
 
+  @State previewWidth: number = 0; // 预览区域宽（= 视频显示宽）
+  @State previewHeight: number = 0; // 预览区域高（= 视频显示高）
+  @State cropRect: videoRect = {
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0
+  };
+  private lastX: number = 0;
+  private lastY: number = 0;
+  private activeHandle: string = ''; // 'move' | 'lt' | 'rt' | 'lb' | 'rb'
+  private dragging: boolean = false;
+  private resizing: boolean = false;
+  // 画布上下文配置 & 上下文对象
+  private cropCanvasSettings: RenderingContextSettings = new RenderingContextSettings(true)
+  private cropCanvasCtx: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.cropCanvasSettings)
   private xComponentController: XComponentController = new XComponentController();
   @State surfaceID: string = '';
   @State avPlayer: AVPlayerDemo = new AVPlayerDemo('');
   @State private currentWidth: number = 0; //视频容器宽高
   @State private currentHeight: number = 0;
   @State private scaleVideo: number = 0; // 视频缩放比
-  @State private cropWidth: number = 0; //Canvas裁切宽高
-  @State private cropHeight: number = 0;
-  @State private startX: number = 0; //裁切后的坐标信息
-  @State private startY: number = 0;
-  @State private endX: number = 0;
-  @State private endY: number = 0;
-  @State private X1: number = 0; //裁切后的坐标信息
-  @State private Y1: number = 0;
-  @State private X2: number = 0;
-  @State private Y2: number = 0;
   @State private isOr: boolean = false;
   @State isSelecting: boolean = false; //是否裁切
   @State isCropDone: boolean = false; //用于控制确定和撤销裁切
   @State cropDone: boolean = false; //用于控制buildMask显示
   private file: fileIo.File | null = null; // 视频文件描述符
-  private cropValue: videoRect = {
-    // ffmpeg裁切信息
-    x: 0,
-    y: 0,
-    width: 0,
-    height: 0
-  };
-  private canvasContext: CanvasRenderingContext2D = new CanvasRenderingContext2D();
+
   //================================================================================
   private context = this.getUIContext().getHostContext()!
   private videoController: VideoController = new VideoController() // 视频控制器
@@ -729,7 +728,7 @@ export struct VideoToLiveWallpaper {
                           // 如果当前已显示比例参数，则隐藏
                           this.isShowParameterAdjustment = false
                         } else {
-                          this.videoScale = 0                                   //======================= 明天修改要求  只将自定义功能隔离出来==================//
+                          this.videoScale = 0 //======================= 明天修改要求  只将自定义功能隔离出来==================//
                           this.isShowParameterAdjustment = true
                           this.AdjustParameters = AdjustableParameters.Speed
                         }
@@ -843,176 +842,409 @@ export struct VideoToLiveWallpaper {
 
   @Builder
   cropVideoComponent() {
-    Stack() {
+    Stack({ alignContent: Alignment.TopStart }) {
+      // 底层：XComponent 播放视频
       XComponent({
         id: 'VideoCropping',
         type: XComponentType.SURFACE,
         controller: this.xComponentController
       })
         .onLoad(async () => {
-          this.isOr = await videoCropUtil.getVideoOrientation(this.selectedVideoUri, this.context) //判断视频是否旋转
-          if (!this.isOr) {
-            if (this.videoSize.photoSize.width! > this.videoSize.photoSize.height!) {
-              this.scaleVideo = this.currentWidth/ this.videoSize.photoSize.width!
-              this.xComponentController.setXComponentSurfaceRect({
-                surfaceWidth: this.getUIContext().vp2px(this.currentWidth),
-                surfaceHeight: this.getUIContext().vp2px(this.scaleVideo*this.videoSize.photoSize.height!)
-              });
-            } else {
-              this.scaleVideo = this.currentHeight/ this.videoSize.photoSize.height!
-              this.xComponentController.setXComponentSurfaceRect({
-                surfaceWidth: this.getUIContext().vp2px(this.scaleVideo*this.videoSize.photoSize.width!),
-                surfaceHeight: this.getUIContext().vp2px(this.currentHeight)
-              });
-            }
-          }else {
-            if (this.videoSize.photoSize.width! > this.videoSize.photoSize.height!) {
-              this.scaleVideo = this.currentHeight/ this.videoSize.photoSize.width!
-              this.xComponentController.setXComponentSurfaceRect({
-                surfaceWidth: this.getUIContext().vp2px(this.scaleVideo*this.videoSize.photoSize.height!),
-                surfaceHeight: this.getUIContext().vp2px(this.currentHeight)
-              });
-            } else {
-              this.scaleVideo = this.currentWidth/ this.videoSize.photoSize.height!
-              this.xComponentController.setXComponentSurfaceRect({
-                surfaceWidth: this.getUIContext().vp2px(this.currentWidth),
-                surfaceHeight: this.getUIContext().vp2px(this.scaleVideo*this.videoSize.photoSize.width!)
-              });
-            }
+          this.isOr = await videoCropUtil.getVideoOrientation(this.selectedVideoUri, this.context)   //判断视频是否旋转
+          let w = this.videoSize.photoSize.width
+          let h = this.videoSize.photoSize.height
+
+          if (this.isOr) {   // 如果视频是旋转的，将宽高置换
+            h = this.videoSize.photoSize.width
+            w = this.videoSize.photoSize.height
           }
+
+          // 设置画布显示尺寸大小（和你原来的逻辑一致）
+          if (w! > h!) {
+            this.scaleVideo = this.currentWidth / w!
+            const displayH = this.scaleVideo * h!
+            this.previewWidth = this.currentWidth
+            this.previewHeight = displayH
+
+            this.xComponentController.setXComponentSurfaceRect({
+              surfaceWidth: this.getUIContext().vp2px(this.previewWidth),
+              surfaceHeight: this.getUIContext().vp2px(this.previewHeight)
+            })
+          } else {
+            this.scaleVideo = this.currentHeight / h!
+            const displayW = this.scaleVideo * w!
+            this.previewWidth = displayW
+            this.previewHeight = this.currentHeight
+
+            this.xComponentController.setXComponentSurfaceRect({
+              surfaceWidth: this.getUIContext().vp2px(this.previewWidth),
+              surfaceHeight: this.getUIContext().vp2px(this.previewHeight)
+            })
+          }
+
+          // 初始化一个居中的裁剪框（80%大小）
+          const initW = this.previewWidth * 0.8
+          const initH = this.previewHeight * 0.8
+          this.cropRect = {
+            x: (this.previewWidth - initW) / 2,
+            y: (this.previewHeight - initH) / 2,
+            width: initW,
+            height: initH
+          }
+
           this.surfaceID = this.xComponentController.getXComponentSurfaceId();
-          this.avPlayer = new AVPlayerDemo(this.surfaceID, 0);
-          this.avPlayer.avPlayerUrlDemo(this.file?.fd)
-
+          this.avPlayer = new AVPlayerDemo(this.surfaceID, 0);  // 创建AVPlayer实例
+          this.avPlayer.avPlayerUrlDemo(this.file?.fd)          // 将已经视频文件描述符传给AVPlayer用于打开视频
         })
+        // XComponent 在 UI 上也用同样的大小
+        .width(this.previewWidth || '100%')
+        .height(this.previewHeight || '100%')
 
-    }.height('100%')
+      // 上层：裁剪蒙层
+      if (this.previewWidth > 0 && this.previewHeight > 0) {
+        this.cropMask()
+      }
+
+    }
+    .alignContent(Alignment.Center)
+    .height('100%')
     .width('100%')
-
-    // Stack() {
-    //   Video({ src: this.selectedVideoUri, controller: this.videoController, previewUri: this.pixelMapShow })
-    //     .objectFit(ImageFit.Contain)
-    //     .animation({
-    //       duration: 400,
-    //       curve: Curve.EaseInOut
-    //     })
-    //     .controls(false)
-    //     .visibility(this.selectedVideoUri ? Visibility.Visible : Visibility.None)
-    //     .transition(TransitionEffect.scale({ x: 0.2, y: 0.2 }).animation({ curve: curves.springMotion(0.6, 0.8) }))
-    //     .onUpdate((event) => {
-    //       if (event) {
-    //         // 更新当前播放时间
-    //         this.currentTime = event.time * 1000; // 转换为毫秒
-    //         this.currentTimeShow = videoCropUtil.formatDurationSecond(event.time)
-    //
-    //         // 更新播放指示条位置
-    //         const newOffset = this.timeToOffset(event.time * 1000);
-    //         if (newOffset >= this.currentOffsetOrigin) {
-    //           this.currentOffset = newOffset
-    //         }
-    //
-    //         // 视频播放到结束位置时自动暂停
-    //         if (event.time >= this.endTime / 1000 - 1) { // 1秒容差
-    //           console.log('视频播放到结束位置，自动暂停');
-    //           this.videoController.pause()
-    //           this.isVideoStart = false
-    //           this.currentTime = this.endTime;
-    //           this.currentOffset = this.timeToOffset(this.endTime)
-    //           this.currentOffsetOrigin = this.currentOffset
-    //         }
-    //       }
-    //     })
-    //     .onPause(() => {
-    //       this.isVideoStart = false
-    //       console.log('结束播放了');
-    //     })
-    //     .onPrepared(() => {
-    //       // 视频准备就绪时，只更新UI状态，不设置播放时间
-    //       console.log('视频准备就绪');
-    //       this.currentOffset = this.timeToOffset(this.startTime);
-    //       this.currentOffsetOrigin = this.currentOffset;
-    //     })
-    //     .onStart(() => {
-    //       console.log('视频开始播放');
-    //       this.isPlayed = true
-    //       this.isVideoStart = true
-    //       // 同步播放指示条位置到当前时间
-    //       this.currentOffset = this.timeToOffset(this.currentTime)
-    //       this.currentOffsetOrigin = this.currentOffset
-    //     })
-    //     .onSizeChange(async (oldValue: SizeOptions, newValue: SizeOptions) => {
-    //       if (this.videoSize.photoSize.width! > this.videoSize.photoSize.height!) {
-    //         this.scaleVideo = Number(newValue.width) / this.videoSize.photoSize.width!
-    //         this.currentHeight = this.scaleVideo * this.videoSize.photoSize.height!
-    //         this.currentWidth = Number(newValue.width)
-    //       } else {
-    //         this.scaleVideo = Number(newValue.height) / this.videoSize.photoSize.height!
-    //         this.currentWidth = this.scaleVideo * this.videoSize.photoSize.width!
-    //         this.currentHeight = Number(newValue.height)
-    //       }
-    //       this.isOr = await videoCropUtil.getVideoOrientation(this.selectedVideoUri, this.context)
-    //       if (this.isOr) {
-    //         let temp = this.currentWidth
-    //         this.currentWidth = this.currentHeight - 10
-    //         this.currentHeight = temp - 20
-    //       }
-    //     })
-    //
-    //   if (this.AdjustParameters == AdjustableParameters.Crop) {
-    //     if (!this.cropDone) {
-    //       Column()
-    //         .width(this.currentWidth)
-    //         .height(this.currentHeight)
-    //         .backgroundColor('rgba(0,0,0,0.6)')
-    //       Canvas(this.canvasContext)
-    //         .width(this.currentWidth)
-    //         .height(this.currentHeight)
-    //         .onTouch((event) => this.handleTouchEvent(event))
-    //       if (this.isCropDone) {
-    //         Row({ space: 10 }) {
-    //           Image($r("app.media.Undo"))
-    //             .width(20)
-    //             .onClick(() => {
-    //               this.X1 = 0;
-    //               this.Y1 = 0;
-    //               this.X2 = 0;
-    //               this.Y2 = 0;
-    //               this.canvasContext.clearRect(0, 0, this.currentWidth, this.currentHeight)
-    //               this.isCropDone = false;
-    //               this.cropDone = false;
-    //             })
-    //           Image($r('app.media.check'))
-    //             .width(20)
-    //             .onClick(async () => {
-    //               promptAction.showToast({ message: "裁切成功" })
-    //               console.log("zhao  真实宽度:" + this.videoSize.photoSize.width! + "  真实高度：" +
-    //                 this.videoSize.photoSize.height! + "\n" +
-    //                 "容器宽高： " + this.currentWidth + " , " + this.currentHeight)
-    //
-    //               this.canvasContext.clearRect(0, 0, this.currentWidth, this.currentHeight)
-    //               this.isCropDone = false;
-    //               this.cropDone = true;
-    //
-    //
-    //               this.cropValue = {
-    //                 x: this.X1 / this.scaleVideo,
-    //                 y: this.Y1 / this.scaleVideo,
-    //                 width: (this.X2 - this.X1) / this.scaleVideo,
-    //                 height: (this.Y2 - this.Y1) / this.scaleVideo
-    //               }
-    //
-    //               //387.69  360.3
-    //             })
-    //         }.position({ x: this.X2, y: this.Y2 })
-    //         .justifyContent(FlexAlign.Center)
-    //         .padding(15)
-    //       }
-    //     } else {
-    //       this.buildMask();
-    //     }
-    //   }
-    // }
   }
+
+  //自定义视频尺寸截取遮罩
+  @Builder
+  cropMask() {
+    Canvas(this.cropCanvasCtx)
+      .width(this.previewWidth)
+      .height(this.previewHeight)
+      .onReady(() => {
+        // 每次 ready 或尺寸变化时重画一遍
+        this.drawCropMask()
+      })
+      .onTouch((event: TouchEvent) => {
+        this.onCropTouch(event)
+        // 手势改变了 cropRect 之后，重画一次
+        this.drawCropMask()
+      })
+  }
+
+
+  private hitTestHandle(x: number, y: number): string {
+    const r = this.cropRect
+    const handleSize = 30  // 角 handle 半径
+    const edgeThickness = 20  // 边 handle 的点击高度/宽度
+
+    // 四角
+    if (Math.abs(x - r.x) < handleSize && Math.abs(y - r.y) < handleSize) return 'lt'
+    if (Math.abs(x - (r.x + r.width)) < handleSize && Math.abs(y - r.y) < handleSize) return 'rt'
+    if (Math.abs(x - r.x) < handleSize && Math.abs(y - (r.y + r.height)) < handleSize) return 'lb'
+    if (Math.abs(x - (r.x + r.width)) < handleSize && Math.abs(y - (r.y + r.height)) < handleSize) return 'rb'
+
+    // 上边中段
+    if (Math.abs(y - r.y) < edgeThickness && x > r.x + handleSize && x < r.x + r.width - handleSize) {
+      return 'top'
+    }
+    // 下边中段
+    if (Math.abs(y - (r.y + r.height)) < edgeThickness && x > r.x + handleSize && x < r.x + r.width - handleSize) {
+      return 'bottom'
+    }
+    // 左边中段
+    if (Math.abs(x - r.x) < edgeThickness && y > r.y + handleSize && y < r.y + r.height - handleSize) {
+      return 'left'
+    }
+    // 右边中段
+    if (Math.abs(x - (r.x + r.width)) < edgeThickness && y > r.y + handleSize && y < r.y + r.height - handleSize) {
+      return 'right'
+    }
+
+    // 框内拖动
+    if (x > r.x && x < r.x + r.width && y > r.y && y < r.y + r.height) return 'move'
+
+    return ''
+  }
+
+
+  private updateCropRect(dx: number, dy: number) {
+    const maxW: number = this.previewWidth
+    const maxH: number = this.previewHeight
+    const minSize: number = 60
+
+    let left: number = this.cropRect.x
+    let top: number = this.cropRect.y
+    let right: number = this.cropRect.x + this.cropRect.width
+    let bottom: number = this.cropRect.y + this.cropRect.height
+
+    // ========== 1. 整体移动 ==========
+    if (this.dragging && this.activeHandle === 'move') {
+      left += dx
+      right += dx
+      top += dy
+      bottom += dy
+
+      const widthNow: number = right - left
+      const heightNow: number = bottom - top
+
+      // 水平方向整体限制在 [0, maxW]
+      if (widthNow <= maxW) {
+        if (left < 0) {
+          right -= left
+          left = 0
+        }
+        if (right > maxW) {
+          const over = right - maxW
+          left -= over
+          right = maxW
+        }
+      }
+
+      // 垂直方向整体限制在 [0, maxH]
+      if (heightNow <= maxH) {
+        if (top < 0) {
+          bottom -= top
+          top = 0
+        }
+        if (bottom > maxH) {
+          const over = bottom - maxH
+          top -= over
+          bottom = maxH
+        }
+      }
+    }
+    // ========== 2. 缩放 ==========
+    else if (this.resizing) {
+      const dragLeft: boolean   = (this.activeHandle === 'lt' || this.activeHandle === 'lb' || this.activeHandle === 'left')
+      const dragRight: boolean  = (this.activeHandle === 'rt' || this.activeHandle === 'rb' || this.activeHandle === 'right')
+      const dragTop: boolean    = (this.activeHandle === 'lt' || this.activeHandle === 'rt' || this.activeHandle === 'top')
+      const dragBottom: boolean = (this.activeHandle === 'lb' || this.activeHandle === 'rb' || this.activeHandle === 'bottom')
+
+      // 先根据拖拽修改边
+      if (dragLeft) {
+        left += dx
+      }
+      if (dragRight) {
+        right += dx
+      }
+      if (dragTop) {
+        top += dy
+      }
+      if (dragBottom) {
+        bottom += dy
+      }
+
+      // ……下面那段“只约束正在拖的那一侧 + minSize 限制”的逻辑照旧即可
+      // 水平方向
+      if (dragLeft) {
+        if (left < 0) {
+          left = 0
+        }
+        if (right - left < minSize) {
+          left = right - minSize
+          if (left < 0) {
+            left = 0
+            right = minSize
+          }
+        }
+      } else if (dragRight) {
+        if (right > maxW) {
+          right = maxW
+        }
+        if (right - left < minSize) {
+          right = left + minSize
+          if (right > maxW) {
+            right = maxW
+            left = right - minSize
+          }
+        }
+      }
+
+      // 垂直方向
+      if (dragTop) {
+        if (top < 0) {
+          top = 0
+        }
+        if (bottom - top < minSize) {
+          top = bottom - minSize
+          if (top < 0) {
+            top = 0
+            bottom = minSize
+          }
+        }
+      } else if (dragBottom) {
+        if (bottom > maxH) {
+          bottom = maxH
+        }
+        if (bottom - top < minSize) {
+          bottom = top + minSize
+          if (bottom > maxH) {
+            bottom = maxH
+            top = bottom - minSize
+          }
+        }
+      }
+    }
+
+
+    // 写回
+    this.cropRect = {
+      x: left,
+      y: top,
+      width: right - left,
+      height: bottom - top
+    }
+  }
+
+  private drawCropMask() {
+    const ctx: CanvasRenderingContext2D = this.cropCanvasCtx
+    const r = this.cropRect
+    const w = this.previewWidth
+    const h = this.previewHeight
+
+    // 1. 清空画布
+    ctx.clearRect(0, 0, w, h)
+
+    // 2. 外部暗角（可选，如果不想要就删掉这几行）
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
+    ctx.fillRect(0, 0, w, h)
+    // 挖出中间区域
+    ctx.clearRect(r.x, r.y, r.width, r.height)
+
+    // 3. 九宫格辅助线
+    ctx.strokeStyle = '#FFFFFF'
+    ctx.lineWidth = 1
+
+    const colW = r.width / 3
+    const rowH = r.height / 3
+
+    // 竖线
+    ctx.beginPath()
+    ctx.moveTo(r.x + colW, r.y)
+    ctx.lineTo(r.x + colW, r.y + r.height)
+    ctx.moveTo(r.x + 2 * colW, r.y)
+    ctx.lineTo(r.x + 2 * colW, r.y + r.height)
+    ctx.stroke()
+
+    // 横线
+    ctx.beginPath()
+    ctx.moveTo(r.x, r.y + rowH)
+    ctx.lineTo(r.x + r.width, r.y + rowH)
+    ctx.moveTo(r.x, r.y + 2 * rowH)
+    ctx.lineTo(r.x + r.width, r.y + 2 * rowH)
+    ctx.stroke()
+
+    // 4. 四个直角边角
+    const cornerLen = 22  // 边角线长度
+    ctx.lineWidth = 3
+
+    // 左上角
+    ctx.beginPath()
+    ctx.moveTo(r.x, r.y + cornerLen)
+    ctx.lineTo(r.x, r.y)
+    ctx.lineTo(r.x + cornerLen, r.y)
+    ctx.stroke()
+
+    // 右上角
+    ctx.beginPath()
+    ctx.moveTo(r.x + r.width - cornerLen, r.y)
+    ctx.lineTo(r.x + r.width, r.y)
+    ctx.lineTo(r.x + r.width, r.y + cornerLen)
+    ctx.stroke()
+
+    // 左下角
+    ctx.beginPath()
+    ctx.moveTo(r.x, r.y + r.height - cornerLen)
+    ctx.lineTo(r.x, r.y + r.height)
+    ctx.lineTo(r.x + cornerLen, r.y + r.height)
+    ctx.stroke()
+
+    // 右下角
+    ctx.beginPath()
+    ctx.moveTo(r.x + r.width - cornerLen, r.y + r.height)
+    ctx.lineTo(r.x + r.width, r.y + r.height)
+    ctx.lineTo(r.x + r.width, r.y + r.height - cornerLen)
+    ctx.stroke()
+
+    // 5. 四条边中点的小手柄（短白线）
+    const edgeHandleLen = 26
+    const edgeLineWidth = 4
+    ctx.lineWidth = edgeLineWidth
+
+    // 上边中点
+    let cx = r.x + r.width / 2
+    ctx.beginPath()
+    ctx.moveTo(cx - edgeHandleLen / 2, r.y)
+    ctx.lineTo(cx + edgeHandleLen / 2, r.y)
+    ctx.stroke()
+
+    // 下边中点
+    ctx.beginPath()
+    ctx.moveTo(cx - edgeHandleLen / 2, r.y + r.height)
+    ctx.lineTo(cx + edgeHandleLen / 2, r.y + r.height)
+    ctx.stroke()
+
+    // 左边中点
+    let cy = r.y + r.height / 2
+    ctx.beginPath()
+    ctx.moveTo(r.x, cy - edgeHandleLen / 2)
+    ctx.lineTo(r.x, cy + edgeHandleLen / 2)
+    ctx.stroke()
+
+    // 右边中点
+    ctx.beginPath()
+    ctx.moveTo(r.x + r.width, cy - edgeHandleLen / 2)
+    ctx.lineTo(r.x + r.width, cy + edgeHandleLen / 2)
+    ctx.stroke()
+  }
+
+  private onCropTouch(event: TouchEvent) {
+    const touch = event.touches[0]
+    const x = touch.x
+    const y = touch.y
+
+    switch (event.type) {
+      case TouchType.Down:
+        this.activeHandle = this.hitTestHandle(x, y)
+        this.dragging = this.activeHandle === 'move'
+        this.resizing = this.activeHandle !== '' && this.activeHandle !== 'move'
+        this.lastX = x
+        this.lastY = y
+        break
+      case TouchType.Move:
+        const dx = x - this.lastX
+        const dy = y - this.lastY
+        this.lastX = x
+        this.lastY = y
+        if (this.dragging || this.resizing) {
+          this.updateCropRect(dx, dy)
+        }
+        break
+      case TouchType.Up:
+      case TouchType.Cancel:
+        this.dragging = false
+        this.resizing = false
+        this.activeHandle = ''
+        break
+    }
+  }
+
+  private getCropResult():videoRect {
+    const scale = this.scaleVideo   // 你初始化视频时算过的缩放比例
+
+    const cropX = Math.round(this.cropRect.x / scale)
+    const cropY = Math.round(this.cropRect.y / scale)
+    const cropW = Math.round(this.cropRect.width / scale)
+    const cropH = Math.round(this.cropRect.height / scale)
+
+    return {
+      x: cropX,
+      y: cropY,
+      width: cropW,
+      height: cropH
+    }
+  }
+
+
+
+
 
   //构建Video组件的通用Builder================================================================================
   @Builder
@@ -1071,65 +1303,6 @@ export struct VideoToLiveWallpaper {
       })
 
 
-  }
-
-  //裁切后的遮罩
-  @Builder
-  buildMask() {
-    Stack() {
-      Column() {
-        // 顶部遮罩（高度为cropRect.y）
-        Row()
-          .width("100%")
-          .height(this.Y1)
-          .backgroundColor("rgba(0, 0, 0, 0.6)")
-
-        // 中间层（左右遮罩 + 中间留空）
-        Row() {
-          // 左侧遮罩（宽度为cropRect.x）
-          Column()
-            .width(this.X1)
-            .height(this.Y2 - this.Y1)
-            .backgroundColor("rgba(0, 0, 0, 0.6)")
-
-
-          // 中间留空（裁切区域，不遮罩）
-          Column()
-            .width(this.X2 - this.X1)
-            .height(this.Y2 - this.Y1)
-
-
-          // 右侧遮罩（剩余宽度）
-          Column()
-            .width(this.currentWidth - this.X2)
-            .height(this.Y2 - this.Y1)
-            .backgroundColor("rgba(0, 0, 0, 0.6)")
-
-        }
-
-        // 底部遮罩（剩余高度）
-        Row()
-          .width("100%")
-          .height(this.currentHeight - this.Y2)
-          .backgroundColor("rgba(0, 0, 0, 0.6)")
-      }.width('100%')
-      .height('100%')
-
-      Image($r('app.media.Undo'))
-        .width(40)
-        .position({ x: this.currentWidth / 2, y: 20 })// =============================================
-        .onClick(() => {
-          promptAction.showToast({ message: '已取消裁切' })
-          this.cropValue = {
-            x: 0,
-            y: 0,
-            width: 0,
-            height: 0
-          }
-          this.cropDone = false;
-        })
-    }.width(this.currentWidth)
-    .height(this.currentHeight)
   }
 
   //选择视频的按钮Builder
@@ -1434,9 +1607,9 @@ export struct VideoToLiveWallpaper {
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
         .onClick(() => {
-          if(item.aspRatio === -1&&!this.selectedVideoUri){
-            promptAction.showToast({message:'选中视频后，才可以使用'})
-          }else {
+          if (item.aspRatio === -1 && !this.selectedVideoUri) {
+            promptAction.showToast({ message: '选中视频后，才可以使用' })
+          } else {
             this.selectIndex = index
             this.videoScale = item.aspRatio
             if (item.ratio) {
@@ -1845,13 +2018,15 @@ export struct VideoToLiveWallpaper {
       destFile = await fileIo.open(albumUri, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE);
       console.info('目标文件已打开，可以开始后台生成GIF')
 
+      let cropValue=this.getCropResult()
+
       // 生成GIF
       const gifPath = await this.createGifWithFFmpeg(
         this.selectedVideoUri,
         this.startTime,
         this.endTime,
         this.gifSpeed,
-        this.cropValue,
+        cropValue,
         this.gifCropRatio
       );
 
@@ -1914,57 +2089,6 @@ export struct VideoToLiveWallpaper {
     return (offset / timelineWidth) * this.fullTime
   }
 
-  /**
-   * 将处理Canvas绘制，同时获取坐标信息
-   * @param event 触摸事件信息
-   */
-  private handleTouchEvent(event: TouchEvent) {
-    switch (event.type) {
-      case TouchType.Down:
-        // 触摸开始：记录起点坐标
-        this.startX = event.touches[0].x
-        this.startY = event.touches[0].y
-        this.isSelecting = true
-        this.isCropDone = false
-        this.cropDone = false
-        break
-      case TouchType.Move:
-        // 触摸移动：更新终点坐标，并重新绘制选择框
-        if (this.isSelecting) {
-          this.endX = event.touches[0].x
-          this.endY = event.touches[0].y
-          this.drawSelectionBox()
-        }
-        break
-      case TouchType.Up:
-        // 触摸结束：停止选择
-        this.isSelecting = false
-        this.isCropDone = true
-        break
-    }
-  }
-
-  // 绘制裁切效果（在Canvas上）
-  private drawSelectionBox() {
-    // 清空之前的绘制
-    this.canvasContext.clearRect(0, 0, this.currentWidth, this.currentHeight)
-
-    // 计算选择框的实际坐标（确保x1 < x2, y1 < y2）
-    this.X1 = Math.max(0, Math.min(this.startX, this.endX))
-    this.Y1 = Math.max(0, Math.min(this.startY, this.endY))
-    this.X2 = Math.min(this.currentWidth, Math.max(this.startX, this.endX))
-    this.Y2 = Math.min(this.currentHeight, Math.max(this.startY, this.endY))
-
-    this.cropWidth = this.X2 - this.X1
-    this.cropHeight = this.Y2 - this.Y1
-
-    // 绘制选择框：白色边框 + 半透明蓝色填充（突出显示选择区域）
-    this.canvasContext.strokeStyle = "#FFFFFF" // 边框颜色
-    this.canvasContext.lineWidth = 2 // 边框宽度
-    this.canvasContext.fillStyle = "rgba(0, 120, 255, 0.2)" // 填充色（半透明）
-    this.canvasContext.fillRect(this.X1, this.Y1, this.cropWidth, this.cropHeight) // 填充矩形
-    this.canvasContext.strokeRect(this.X1, this.Y1, this.cropWidth, this.cropHeight) // 绘制边框
-  }
 
   /**
    * 将GIF文件内容写入已打开的相册文件
